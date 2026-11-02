@@ -17,6 +17,7 @@ import type { SFSymbol } from 'sf-symbols-typescript';
 import { TipIds } from '@/constants/Tips';
 import { getDateRangeOfWeek, getWeekNumberFromDate } from '@/database/useHomework';
 import { retireTip } from '@/stores/tips';
+import { useVikunjaStore } from '@/stores/vikunja';
 import { useAlert } from "@/ui/components/AlertProvider";
 import Tip from '@/ui/components/Tip';
 import MainTabErrorBoundary from '@/ui/components/MainTabErrorBoundary';
@@ -305,6 +306,8 @@ const TasksView: React.FC = () => {
   );
 
   const openNewTask = useCallback(() => router.push("/(modals)/tasks/custom"), []);
+  const showVikunja = useVikunjaStore(state => state.connected && state.showInApp);
+  const openVikunja = useCallback(() => router.push("/(features)/vikunja"), []);
 
   const closeWeekPicker = useCallback(() => setShowWeekPicker(false), [setShowWeekPicker]);
 
@@ -358,6 +361,9 @@ const TasksView: React.FC = () => {
       {isAndroid ? (
         <Stack.Toolbar placement="right" asChild>
           <View style={styles.toolbarRow}>
+            {showVikunja && (
+              <AndroidHeaderButton icon="Tasks" accessibilityLabel="Vikunja" onPress={openVikunja} />
+            )}
             <AndroidHeaderButton icon="Plus" accessibilityLabel={t('Task_New_Title')} onPress={openNewTask} />
             <AndroidHeaderMenu
               icon="Filter"
@@ -374,6 +380,9 @@ const TasksView: React.FC = () => {
         </Stack.Toolbar>
       ) : (
         <Stack.Toolbar placement="right">
+          {showVikunja && (
+            <Stack.Toolbar.Button icon="checklist" accessibilityLabel="Vikunja" onPress={openVikunja} />
+          )}
           <Stack.Toolbar.Button icon="plus" accessibilityLabel={t('Task_New_Title')} onPress={openNewTask} />
           <Stack.Toolbar.Menu>
             <Stack.Toolbar.Icon sf="line.3.horizontal.decrease" />

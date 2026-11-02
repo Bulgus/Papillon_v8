@@ -12,6 +12,7 @@ import { error } from '@/utils/logger/logger';
 import { trackAdvancedEvent } from '@/utils/logger/analytics';
 import { notificationAsync, NotificationFeedbackType } from "expo-haptics";
 import { useFocusEffect } from "expo-router";
+import { mirrorHomeworkCompletion, syncHomeworksToVikunja } from "@/services/vikunja";
 
 // Cache reads are coalesced over this window: fetching five weeks would
 // otherwise re-query every one of them five times over.
@@ -148,6 +149,7 @@ export const useHomeworkData = (weeks: number[], alert: any) => {
         }
         fetchedWeeks.current.add(week);
         setHomework(prev => ({ ...prev, ...fetched }));
+        syncHomeworksToVikunja(result.filter(hw => !hw.fromCache)).catch(() => undefined);
         scheduleRefresh();
         // The manager falls back to the cache rather than throwing, so a service
         // that failed is only visible through its recorded failures.
@@ -219,6 +221,7 @@ export const useHomeworkData = (weeks: number[], alert: any) => {
         }
 
         await updateHomeworkIsDone(id, done);
+        mirrorHomeworkCompletion(item, done);
 
         // The optimistic entry is what flips the checkbox: the database write
         // and its cache read land a moment later.

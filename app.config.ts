@@ -135,6 +135,9 @@ export default {
       ],
       "expo-web-browser",
       "expo-secure-store",
+      // Local notifications only: the expo-notifications plugin is left out on
+      // purpose, it would add the push entitlement that sideloading certs lack.
+      "expo-background-task",
       [
         "expo-location",
         {

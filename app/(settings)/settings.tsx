@@ -212,6 +212,15 @@ export default function SettingsIndex() {
         router.navigate("/(settings)/features")
       }
     },
+    {
+      icon: <Papicons name={"Bell"} />,
+      title: "Intégrations",
+      description: "Notifications, Vikunja",
+      color: "#0090A8",
+      onPress: () => {
+        router.navigate("/(settings)/integrations")
+      }
+    },
     ...(MAGIC_AVAILABLE ? [{
       icon: <Papicons name={"Sparkles"} />,
       title: "Magic+",

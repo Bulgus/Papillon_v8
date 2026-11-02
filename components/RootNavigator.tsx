@@ -240,6 +240,17 @@ function RootNavigatorContent() {
         />
 
         <Stack.Screen
+          name="(features)/vikunja"
+          options={{
+            headerShown: true,
+            headerTitle: "Vikunja",
+            headerTransparent: runsIOS26,
+            headerLargeTitle: false,
+            presentation: "modal",
+          }}
+        />
+
+        <Stack.Screen
           name="(features)/attendance"
           options={{
             headerShown: false,

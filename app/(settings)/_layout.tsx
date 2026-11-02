@@ -136,6 +136,14 @@ export default function Layout() {
           }}
         />*/}
         <Stack.Screen
+          name="integrations"
+          options={{
+            headerTitle: "Intégrations",
+            headerBackButtonDisplayMode: "minimal",
+            headerLargeTitle: false,
+          }}
+        />
+        <Stack.Screen
           name="features"
           options={{
             headerTitle: t("Settings_Features_Title"),

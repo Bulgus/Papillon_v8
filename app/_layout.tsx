@@ -1,6 +1,8 @@
 
 import 'react-native-reanimated';
 import "@/utils/i18n";
+// Defines the background refresh task: has to happen at module load.
+import "@/services/notifications";
 
 import { Buffer } from 'buffer';
 import React, { useEffect, useMemo, useRef } from 'react';

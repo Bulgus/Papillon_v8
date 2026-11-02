@@ -5,7 +5,9 @@ import { useFonts } from 'expo-font';
 
 import { initializeDatabaseOnStartup } from '@/database/utils/initialization';
 import { configureTips, resetTipsDatastore, showAllTips } from '@/modules/papillon-tips';
+import { runNotificationCheck, setupNotifications } from '@/services/notifications';
 import { initializeAccountManager } from '@/services/shared';
+import { useAccountStore } from '@/stores/account';
 import { useSettingsStore } from '@/stores/settings';
 import { useTipsStore } from '@/stores/tips';
 import i18n from '@/utils/i18n';
@@ -98,7 +100,9 @@ export function useAppInitialization() {
           const durationMs = now - lastBackgroundRef.current;
 
           if (durationMs > 5 * 60 * 1000) {
-            initializeAccountManager().catch(e => warn(`Background account refresh failed: ${e}`));
+            initializeAccountManager()
+              .then(() => runNotificationCheck())
+              .catch(e => warn(`Background account refresh failed: ${e}`));
           }
         }
       }
@@ -114,6 +118,18 @@ export function useAppInitialization() {
       subscription.remove();
     };
   }, []);
+
+  // Notifications (new grades, homework, low canteen balance, daily digest)
+  // and the iOS background refresh. Delayed so the first account refresh,
+  // started by the home screen, is done before the first comparison.
+  const lastUsedAccount = useAccountStore(state => state.lastUsedAccount);
+  useEffect(() => {
+    if (!fontsLoaded || !lastUsedAccount) {return;}
+    const timer = setTimeout(() => {
+      setupNotifications().catch(err => warn(`Notifications setup failed: ${err}`));
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [fontsLoaded, lastUsedAccount]);
 
   // Magic/ModelManager Initialization
   useEffect(() => {

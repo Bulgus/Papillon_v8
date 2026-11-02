@@ -19,7 +19,9 @@ import { getAttachmentIcon } from "@/utils/news/getAttachmentIcon";
 import { getSubjectColor } from "@/utils/subjects/colors";
 import { getSubjectEmoji } from "@/utils/subjects/emoji";
 import { getSubjectName } from "@/utils/subjects/name";
-import { Platform } from "react-native";
+import { Alert, Platform } from "react-native";
+import { exportHomeworkToVikunja, isHomeworkExported, mirrorHomeworkCompletion } from "@/services/vikunja";
+import { useVikunjaStore } from "@/stores/vikunja";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import List from "@/ui/new/List";
 import Typography from "@/ui/new/Typography";
@@ -83,15 +85,38 @@ const Task = () => {
 
   const setAsDone = async (done: boolean) => {
     if (!task) return;
-    // A custom task has no service to sync its state with.
-    if (!task.custom) {
-      const manager = getManager();
-      await manager?.setHomeworkCompletion(task, done);
-    }
-
-    await updateHomeworkIsDone(id, done);
+    const previous = isDone;
     setIsDone(done);
+    try {
+      // A custom task has no service to sync its state with.
+      if (!task.custom) {
+        const manager = getManager();
+        await manager?.setHomeworkCompletion(task, done);
+      }
+      await updateHomeworkIsDone(id, done);
+      mirrorHomeworkCompletion(task, done);
+    } catch (error) {
+      setIsDone(previous);
+      Alert.alert("Devoir non mis à jour", String(error instanceof Error ? error.message : error));
+    }
   }
+
+  const vikunjaConnected = useVikunjaStore(state => state.connected);
+  const exportedMap = useVikunjaStore(state => state.exported);
+  const [exporting, setExporting] = useState(false);
+  const exportedToVikunja = task ? Boolean(exportedMap) && isHomeworkExported(task) : false;
+
+  const sendToVikunja = async () => {
+    if (!task || exporting) return;
+    setExporting(true);
+    try {
+      await exportHomeworkToVikunja({ ...task, isDone });
+    } catch (error) {
+      Alert.alert("Vikunja", String(error instanceof Error ? error.message : error));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const editTask = () => {
     if (!task) {
@@ -245,6 +270,29 @@ const Task = () => {
             </Typography>
           </List.Item>
         </List.Section>
+
+        {vikunjaConnected && (
+          <List.Section>
+            <List.SectionTitle>
+              <List.Label>Vikunja</List.Label>
+            </List.SectionTitle>
+            <List.Item onPress={exportedToVikunja ? undefined : sendToVikunja}>
+              <List.Leading>
+                <Icon>
+                  <Papicons name={exportedToVikunja ? "Check" : "Tasks"} />
+                </Icon>
+              </List.Leading>
+              <Typography variant="title">
+                {exportedToVikunja ? "Dans ton Vikunja" : exporting ? "Envoi…" : "Envoyer vers Vikunja"}
+              </Typography>
+              <Typography variant="body1" color="textSecondary">
+                {exportedToVikunja
+                  ? "Cocher ce devoir le cochera aussi dans Vikunja"
+                  : "Crée la tâche dans le projet de la matière"}
+              </Typography>
+            </List.Item>
+          </List.Section>
+        )}
 
         <List.Section>
           <List.SectionTitle>

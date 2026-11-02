@@ -111,6 +111,7 @@ export default function TurboSelfLoginWithCredentials() {
         
                 router.back();
                 router.dismissAll();
+                return;
       }
 
       store.addAccount({

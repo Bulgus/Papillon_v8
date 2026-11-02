@@ -1,6 +1,6 @@
 import { Database } from "@nozbe/watermelondb";
 
-import { debug, error, warn } from "@/utils/logger/logger";
+import { debug, error, info, warn } from "@/utils/logger/logger";
 
 import { getDatabaseInstance } from "../DatabaseProvider";
 

@@ -115,7 +115,7 @@ export async function fetchPronoteCourseResources(
     TabLocation.Timetable
   );
   if (!timetableTab) {
-    error("Timetable tab not found in session", "fetchPronoteCourseResources");
+    throw error("Timetable tab not found in session", "fetchPronoteCourseResources");
   }
 
   if (!course.resourceId) {

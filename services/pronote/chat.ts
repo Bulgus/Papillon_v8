@@ -44,7 +44,7 @@ export async function fetchPronoteChatRecipients(
 
   const chatTab = session.user.resources[0].tabs.get(TabLocation.Discussions);
   if (!chatTab) {
-    error("Chat tab not found in session", "fetchPronoteChatRecipients");
+    throw error("Chat tab not found in session", "fetchPronoteChatRecipients");
   }
 
   if (!chat.ref) {
@@ -78,7 +78,7 @@ export async function fetchPronoteChatMessages(
 
   const chatTab = session.user.resources[0].tabs.get(TabLocation.Discussions);
   if (!chatTab) {
-    error("Chat tab not found in session", "fetchPronoteChatMessages");
+    throw error("Chat tab not found in session", "fetchPronoteChatMessages");
   }
 
   if (!chat.ref) {
@@ -120,7 +120,7 @@ export async function sendPronoteMessageInChat(
 
   const chatTab = session.user.resources[0].tabs.get(TabLocation.Discussions);
   if (!chatTab) {
-    error("Chat tab not found in session", "fetchPronoteChatMessages");
+    throw error("Chat tab not found in session", "fetchPronoteChatMessages");
   }
 
   if (!chat.ref) {
@@ -143,7 +143,7 @@ export async function fetchPronoteRecipients(
 
   const chatTab = session.user.resources[0].tabs.get(TabLocation.Discussions);
   if (!chatTab) {
-    error("Chat tab not found in session", "fetchPronoteChatMessages");
+    throw error("Chat tab not found in session", "fetchPronoteChatMessages");
   }
 
   const alLRecipients = await Promise.all(

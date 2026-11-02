@@ -21,17 +21,17 @@ import { error } from "@/utils/logger/logger";
  */
 export async function fetchPronoteAttendance(session: SessionHandle, accountId: string, period: string): Promise<Attendance> {
   if (!session) {
-    error("Session is undefined", "fetchPronoteAttendance");
+    throw error("Session is undefined", "fetchPronoteAttendance");
   }
 
   const attendanceTab = session.user.resources[0].tabs.get(TabLocation.Notebook);
   if (!attendanceTab) {
-    error("Attendance tab not found in session", "fetchPronoteAttendance");
+    throw error("Attendance tab not found in session", "fetchPronoteAttendance");
   }
 
   const pawnotePeriod = attendanceTab.periods.find(p => p.name === period);
   if (!pawnotePeriod) {
-    error(`Period "${period}" not found in attendance tab`, "fetchPronoteGrades");
+    throw error(`Period "${period}" not found in attendance tab`, "fetchPronoteGrades");
   }
 
   const attendance = await notebook(session, pawnotePeriod);
@@ -58,7 +58,7 @@ export async function fetchPronoteAttendance(session: SessionHandle, accountId: 
 export async function fetchPronoteAttendancePeriods(session: SessionHandle, accountId: string): Promise<Period[]> {
   const attendanceTab = session.user.resources[0].tabs.get(TabLocation.Notebook);
   if (!attendanceTab) {
-    error("Attendance tab not found in session", "fetchPronotePeriods");
+    throw error("Attendance tab not found in session", "fetchPronotePeriods");
   }
 
   return attendanceTab.periods.map(p => ({

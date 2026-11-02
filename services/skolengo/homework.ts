@@ -53,7 +53,7 @@ export async function fetchSkolengoHomeworks(session: Skolengo, accountId: strin
 
 export async function setSkolengoHomeworkAsDone(accountId: string, homework: Homework, status?: boolean): Promise<Homework> {
   if (!homework.ref) {
-    error("Invalid Homework Reference")
+    throw error("Invalid Homework Reference")
   }
 
   const state = await homework.ref.setCompletion(status || !homework.isDone)

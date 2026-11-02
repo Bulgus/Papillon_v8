@@ -251,7 +251,7 @@ export class AccountManager {
       async client =>
         client.getGradesForPeriod
           ? await client.getGradesForPeriod(period, kid)
-          : error("Bad Implementation"),
+          : Promise.reject(error("Bad Implementation")),
       {
         multiple: false,
         clientId,
@@ -516,7 +516,7 @@ export class AccountManager {
       async client =>
         client.getCanteenQRCodes
           ? await client.getCanteenQRCodes()
-          : error("getCanteenQRCodes not found"),
+          : Promise.reject(error("getCanteenQRCodes not found")),
       {
         multiple: false,
         clientId,

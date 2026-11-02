@@ -40,7 +40,7 @@ export class Alise implements SchoolServicePlugin {
 
   async getCanteenBalances(): Promise<Balance[]> {
     if (!this.session) {
-      error("Session is not valid", "Alise.getCanteenBalances");
+      throw error("Session is not valid", "Alise.getCanteenBalances");
     }
     try {
       return await fetchAliseBalance(this.session, this.accountId);
@@ -51,7 +51,7 @@ export class Alise implements SchoolServicePlugin {
 
   async getCanteenTransactionsHistory(): Promise<CanteenHistoryItem[]> {
     if (!this.session) {
-      error("Session is not valid", "Alise.getCanteenTransactionsHistory");
+      throw error("Session is not valid", "Alise.getCanteenTransactionsHistory");
     }
     try {
       return await fetchAliseHistory(this.session, this.accountId);

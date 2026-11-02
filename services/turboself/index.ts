@@ -53,7 +53,7 @@ export class TurboSelf implements SchoolServicePlugin {
       return fetchTurboSelfBalance(this.session, this.accountId)
     }
 
-    error("Session is not valid", "TurboSelf.getCanteenBalances");
+    throw error("Session is not valid", "TurboSelf.getCanteenBalances");
   }
 
   async getCanteenTransactionsHistory(): Promise<CanteenHistoryItem[]> {
@@ -61,7 +61,7 @@ export class TurboSelf implements SchoolServicePlugin {
       return fetchTurboSelfHistory(this.session, this.accountId)
     }
 		
-    error("Session is not valid", "TurboSelf.getCanteenTransactionsHistory")
+    throw error("Session is not valid", "TurboSelf.getCanteenTransactionsHistory")
   }
 
   async getCanteenQRCodes(): Promise<QRCode> {
@@ -69,7 +69,7 @@ export class TurboSelf implements SchoolServicePlugin {
       return fetchTurboSelfQRCode(this.session, this.accountId)
     }
 
-    error("Session is not valid", "TurboSelf.getCanteenQRCodes")
+    throw error("Session is not valid", "TurboSelf.getCanteenQRCodes")
   }
 	
   async getCanteenBookingWeek(weekNumber: number): Promise<BookingDay[]> {
@@ -77,7 +77,7 @@ export class TurboSelf implements SchoolServicePlugin {
       return fetchTurboSelfBookingsWeek(this.session, this.accountId, weekNumber)
     }
 
-    error("Session is not valid", "TurboSelf.getCanteenBookingWeek")
+    throw error("Session is not valid", "TurboSelf.getCanteenBookingWeek")
   }
 
   async setMealAsBooked(meal: Booking, booked?: boolean): Promise<Booking> {

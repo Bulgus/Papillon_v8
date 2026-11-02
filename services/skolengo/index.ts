@@ -60,7 +60,7 @@ export class Skolengo implements SchoolServicePlugin {
       return fetchSkolengoKids(this.session, this.accountId)
     }
 
-    error("Session is not valid", "Skolengo.getKids");
+    throw error("Session is not valid", "Skolengo.getKids");
   }
 
   async getHomeworks(weekNumber: number): Promise<Homework[]> {
@@ -68,7 +68,7 @@ export class Skolengo implements SchoolServicePlugin {
       return fetchSkolengoHomeworks(this.session, this.accountId, weekNumber);
     }
 
-    error("Session is not valid", "Skolengo.getHomeworks");
+    throw error("Session is not valid", "Skolengo.getHomeworks");
   }
 
   async getNews(): Promise<News[]> {
@@ -76,7 +76,7 @@ export class Skolengo implements SchoolServicePlugin {
       return fetchSkolengoNews(this.session, this.accountId);
     }
 
-    error("Session is not valid", "Skolengo.getNews");
+    throw error("Session is not valid", "Skolengo.getNews");
   }
 
   async getGradesForPeriod(period: Period, kid?: Kid): Promise<PeriodGrades> {
@@ -88,7 +88,7 @@ export class Skolengo implements SchoolServicePlugin {
       return fetchSkolengoGradesForPeriod(this.session, this.accountId, period.id!);
     }
 		
-    error("Session is not valid", "Skolengo.getGradesForPeriod")
+    throw error("Session is not valid", "Skolengo.getGradesForPeriod")
   }
 
   async getGradesPeriods(): Promise<Period[]> {
@@ -96,7 +96,7 @@ export class Skolengo implements SchoolServicePlugin {
       return fetchSkolengoGradePeriods(this.session, this.accountId);
     }
 
-    error("Session is not valid", "Skolengo.getGradesPeriods")
+    throw error("Session is not valid", "Skolengo.getGradesPeriods")
   }
 
   async getAttendanceForPeriod(): Promise<Attendance> {
@@ -112,7 +112,7 @@ export class Skolengo implements SchoolServicePlugin {
       return fetchSkolengoTimetable(this.session, this.accountId, weekNumber)
     }
 		
-    error("Session is not valid", "Skolengo.getWeeklyTimetable")
+    throw error("Session is not valid", "Skolengo.getWeeklyTimetable")
   }
 
   async getChats(): Promise<Chat[]> {
@@ -120,7 +120,7 @@ export class Skolengo implements SchoolServicePlugin {
       return fetchSkolengoChats(this.session, this.accountId)
     }
 
-    error("Session is not valid", "Skolengo.getChats")
+    throw error("Session is not valid", "Skolengo.getChats")
   }
 
   async getChatRecipients(chat: Chat): Promise<Recipient[]> {
@@ -128,7 +128,7 @@ export class Skolengo implements SchoolServicePlugin {
       return fetchSkolengoChatRecipients(chat)
     }
 
-    error("Session is not valid", "Skolengo.getChatsRecipients")
+    throw error("Session is not valid", "Skolengo.getChatsRecipients")
   }
 
   async getChatMessages(chat: Chat): Promise<Message[]> {
@@ -136,7 +136,7 @@ export class Skolengo implements SchoolServicePlugin {
       return fetchSkolengoChatMessages(chat)
     }
 
-    error("Session is not valid", "Skolengo.getChatMessages")
+    throw error("Session is not valid", "Skolengo.getChatMessages")
   }
 
   async setHomeworkCompletion(homework: Homework, state?: boolean): Promise<Homework> {
@@ -148,6 +148,6 @@ export class Skolengo implements SchoolServicePlugin {
       return createSkolengoMail(this.session, this.accountId, subject, content, recipients, cc, bcc)
     }
 
-    error("Session is not valid", "Skolengo.createMail")
+    throw error("Session is not valid", "Skolengo.createMail")
   }
 }

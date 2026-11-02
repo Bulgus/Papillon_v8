@@ -37,7 +37,7 @@ function mapBookings(data: TurboBooking[], accountId: string): BookingDay[] {
 
 export async function setTurboSelfMealBookState(meal: Booking, booked?: boolean): Promise<Booking> {
   if (!meal.ref) {
-    error("Invalid Meal Ref")
+    throw error("Invalid Meal Ref")
   }
 
   booked = booked ?? !meal.booked

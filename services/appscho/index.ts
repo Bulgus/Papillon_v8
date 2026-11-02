@@ -37,7 +37,7 @@ export class Appscho implements SchoolServicePlugin {
       return fetchAppschoTimetable(this.session, this.accountId, weekNumber, instanceId, forceRefresh);
     }
 
-    error("Session is not valid", "Appscho.getWeeklyTimetable");
+    throw error("Session is not valid", "Appscho.getWeeklyTimetable");
   }
 
   async getNews(): Promise<News[]> {
@@ -47,6 +47,6 @@ export class Appscho implements SchoolServicePlugin {
       return fetchAppschoNews(this.session, this.accountId, instanceId);
     }
 
-    error("Session is not valid", "Appscho.getNews");
+    throw error("Session is not valid", "Appscho.getNews");
   }
 }

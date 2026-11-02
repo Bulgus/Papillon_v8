@@ -23,7 +23,7 @@ export async function fetchSkolengoChats(session: Skolengo, accountId: string): 
 
 export async function fetchSkolengoChatRecipients(chat: Chat): Promise<Recipient[]> {
   if (!chat.ref && (typeof chat.ref !== typeof Mail)) {
-    error("Invalid Chat Reference")
+    throw error("Invalid Chat Reference")
   }
 
   return (chat.ref instanceof Mail) ? chat.ref.participants?.map(p => ({
@@ -34,10 +34,13 @@ export async function fetchSkolengoChatRecipients(chat: Chat): Promise<Recipient
 
 export async function fetchSkolengoChatMessages(chat: Chat): Promise<Message[]> {
   if (!chat.ref && (typeof chat.ref !== typeof Mail)) {
-    error("Invalid Chat Reference")
+    throw error("Invalid Chat Reference")
   }
 
-  const messages = (chat.ref instanceof Mail) ? await chat.ref.getMessages() : error("Invalid Chat Reference");
+  if (!(chat.ref instanceof Mail)) {
+    throw error("Invalid Chat Reference");
+  }
+  const messages = await chat.ref.getMessages();
   return messages.map(message => ({
     id: message.id,
     content: message.content,

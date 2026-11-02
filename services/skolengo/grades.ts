@@ -29,7 +29,7 @@ export async function fetchSkolengoGradesForPeriod(session: Skolengo, accountId:
   if (kid) {
     return getGrades(kid, `${kid.firstName} ${kid.lastName}`)
   }
-  error("Kid is not valid")
+  throw error("Kid is not valid")
 	
 }
 

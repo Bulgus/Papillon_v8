@@ -36,7 +36,7 @@ export class ARD implements SchoolServicePlugin {
     if (this.session) {
       return fetchArdBalance(this.session, this.accountId, this.authData);
     }
-    error("Session is not valid", "ARD.getCanteenBalances");
+    throw error("Session is not valid", "ARD.getCanteenBalances");
     return [];
   }
 
@@ -44,7 +44,7 @@ export class ARD implements SchoolServicePlugin {
     if (this.session) {
       return fetchARDHistory(this.session, this.accountId);
     }
-    error("Session is not valid", "ARD.getCanteenTransactionsHistory");
+    throw error("Session is not valid", "ARD.getCanteenTransactionsHistory");
     return [];
   }
 

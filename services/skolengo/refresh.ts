@@ -9,7 +9,7 @@ export async function refreshSkolengoAccount(
   credentials: Auth
 ): Promise<{auth: Auth, session: Skolengo}> {
   if (!credentials.refreshToken) {
-    error("Unable to find refreshToken")
+    throw error("Unable to find refreshToken")
   }
   const refreshUrl: string = String(credentials.additionals?.["refreshUrl"] || "");
   const wellKnown: string = String(credentials.additionals?.["wellKnown"] || "");

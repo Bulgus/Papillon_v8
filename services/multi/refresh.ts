@@ -9,7 +9,7 @@ export async function refreshMultiSession(
   credentials: Auth
 ): Promise<{ auth: Auth; session: Multi }> {
   if (!credentials.refreshToken) {
-    error("Unable to find refreshToken", "refreshMultiSession");
+    throw error("Unable to find refreshToken", "refreshMultiSession");
   }
 
   const instanceUrl = credentials.additionals?.["instanceUrl"] as string;

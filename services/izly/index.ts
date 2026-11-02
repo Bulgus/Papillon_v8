@@ -32,7 +32,7 @@ export class Izly implements SchoolServicePlugin {
       return fetchIzlyBalances(this.accountId, this.session)
     }
 
-    error("Session is not valid", "Izly.getCanteenBalances")
+    throw error("Session is not valid", "Izly.getCanteenBalances")
   }
 
   async getCanteenTransactionsHistory(): Promise<CanteenHistoryItem[]> {
@@ -40,7 +40,7 @@ export class Izly implements SchoolServicePlugin {
       return fetchIzlyHistory(this.accountId, this.session);
     }
 
-    error("Session is not valid", "Izly.getCanteenTransactionsHistory")
+    throw error("Session is not valid", "Izly.getCanteenTransactionsHistory")
   }
 
   async getCanteenQRCodes(): Promise<QRCode> {
@@ -48,6 +48,6 @@ export class Izly implements SchoolServicePlugin {
       return fetchIzlyQRCode(this.accountId, this.session)
     }
 
-    error("Session is not valid", "Izly.getCanteenQRCodes")
+    throw error("Session is not valid", "Izly.getCanteenQRCodes")
   }
 }

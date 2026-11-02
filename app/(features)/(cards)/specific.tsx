@@ -53,6 +53,7 @@ export default function QRCodeAndCardsPage() {
 
   const [history, setHistory] = useState<CanteenHistoryItem[]>([]);
   const [qrcode, setQR] = useState("");
+  const [qrUnavailableReason, setQRUnavailableReason] = useState<string | null>(null);
   const [accountKind, setAccountKind] = useState<CanteenKind>(CanteenKind.ARGENT)
   const [date, setDate] = useState(new Date());
   const [weekNumber, setWeekNumber] = useState(getWeekNumberFromDate(date));
@@ -71,10 +72,12 @@ export default function QRCodeAndCardsPage() {
 
   const fetchQRCode = useCallback(async () => {
     try {
-      const { data } = await manager.getCanteenQRCodes(wallet.createdByAccount);
-      setQR(data);
+      const result = await manager.getCanteenQRCodes(wallet.createdByAccount);
+      setQR(result?.data ?? "");
+      setQRUnavailableReason(null);
     } catch (error) {
       warn(String(error));
+      setQRUnavailableReason(error instanceof Error ? error.message : String(error));
     }
   }, [manager, wallet.createdByAccount]);
 
@@ -82,26 +85,40 @@ export default function QRCodeAndCardsPage() {
 
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
-    const history = await manager.getCanteenTransactionsHistory(wallet.createdByAccount);
-    setHistory(history);
-    setLoadingHistory(false);
+    try {
+      const history = await manager.getCanteenTransactionsHistory(wallet.createdByAccount);
+      setHistory(history);
+    } catch (error) {
+      warn(String(error));
+    } finally {
+      setLoadingHistory(false);
+    }
   }, [manager, wallet.createdByAccount]);
 
   const fetchBookingWeek = useCallback(async () => {
-    const bookings = await manager.getCanteenBookingWeek(weekNumber, wallet.createdByAccount);
-    setBookingWeek(bookings);
-  }, [manager, weekNumber, wallet.createdByAccount]);
+    if (!hasBookingCapacity) {return;}
+    try {
+      const bookings = await manager.getCanteenBookingWeek(weekNumber, wallet.createdByAccount);
+      setBookingWeek(bookings ?? []);
+    } catch (error) {
+      warn(String(error));
+    }
+  }, [manager, weekNumber, wallet.createdByAccount, hasBookingCapacity]);
 
   const fetchKind = useCallback(async () => {
-    const kind = await manager.getCanteenKind(wallet.createdByAccount);
-    setAccountKind(kind);
-  }, [manager, weekNumber, wallet.createdByAccount]);
+    try {
+      const kind = await manager.getCanteenKind(wallet.createdByAccount);
+      setAccountKind(kind ?? CanteenKind.ARGENT);
+    } catch (error) {
+      warn(String(error));
+    }
+  }, [manager, wallet.createdByAccount]);
 
   useEffect(() => {
     fetchQRCode();
     fetchHistory();
     fetchKind();
-  }, [fetchQRCode, fetchHistory]);
+  }, [fetchQRCode, fetchHistory, fetchKind]);
 
   useEffect(() => {
     fetchBookingWeek();
@@ -203,6 +220,15 @@ export default function QRCodeAndCardsPage() {
                 <Typography variant="h6">Afficher le QR-Code</Typography>
               </Stack>
             </AnimatedPressable>
+          )}
+
+          {!qrcode && qrUnavailableReason && service === Services.ARD && (
+            <Stack direction="horizontal" vAlign="center" gap={10} padding={[4, 0]}>
+              <QrCode color={String(colors.text)} opacity={0.4} />
+              <Typography variant="caption" color="secondary" style={{ flex: 1 }}>
+                {qrUnavailableReason}
+              </Typography>
+            </Stack>
           )}
 
           <Stack card direction="horizontal" width="100%">

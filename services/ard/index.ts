@@ -1,33 +1,34 @@
 import { Auth, Services } from "@/stores/account/types";
-import { Capabilities, SchoolServicePlugin } from "../shared/types";
-import { Client } from "@blockshub/blocksrd";
-import { refreshArdAccount } from "./refresh";
-import { Balance } from "../shared/balance";
 import { error } from "@/utils/logger/logger";
+
+import { Balance } from "../shared/balance";
+import { CanteenHistoryItem, QRCode } from "../shared/canteen";
+import { Capabilities, SchoolServicePlugin } from "../shared/types";
 import { fetchArdBalance } from "./balance";
-import { CanteenHistoryItem } from "../shared/canteen";
+import { ArdClient } from "./client";
 import { fetchARDHistory } from "./history";
+import { fetchArdQRCode } from "./qrcode";
+import { refreshArdAccount } from "./refresh";
 
 export class ARD implements SchoolServicePlugin {
   displayName = "ARD";
   service = Services.ARD;
   capabilities: Capabilities[] = [Capabilities.REFRESH];
-  session: Client | undefined = undefined;
+  session: ArdClient | undefined = undefined;
   authData: Auth = {};
 
   constructor(public accountId: string) {}
-
-  private async initCapabilities() {
-    setTimeout(() => {
-      this.capabilities.push(Capabilities.CANTEEN_BALANCE, Capabilities.CANTEEN_HISTORY)
-    }, 3000)
-  }
 
   async refreshAccount(credentials: Auth): Promise<ARD> {
     const refresh = await refreshArdAccount(this.accountId, credentials);
     this.authData = refresh.auth;
     this.session = refresh.session;
-    this.initCapabilities()
+    this.capabilities = [
+      Capabilities.REFRESH,
+      Capabilities.CANTEEN_BALANCE,
+      Capabilities.CANTEEN_HISTORY,
+      Capabilities.CANTEEN_QRCODE,
+    ];
     return this;
   }
 
@@ -35,17 +36,22 @@ export class ARD implements SchoolServicePlugin {
     if (this.session) {
       return fetchArdBalance(this.session, this.accountId, this.authData);
     }
-
     error("Session is not valid", "ARD.getCanteenBalances");
     return [];
   }
 
   async getCanteenTransactionsHistory(): Promise<CanteenHistoryItem[]> {
     if (this.session) {
-      return fetchARDHistory(this.session, this.accountId)
+      return fetchARDHistory(this.session, this.accountId);
     }
-
-    error("Session is not valid", "ARD.getCanteenTransactionsHistory")
+    error("Session is not valid", "ARD.getCanteenTransactionsHistory");
     return [];
+  }
+
+  async getCanteenQRCodes(): Promise<QRCode> {
+    if (!this.session) {
+      throw new Error("Session ARD invalide");
+    }
+    return fetchArdQRCode(this.session, this.accountId);
   }
 }

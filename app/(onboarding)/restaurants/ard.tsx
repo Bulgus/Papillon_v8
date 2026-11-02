@@ -3,7 +3,6 @@ import { useTheme } from "expo-router/react-navigation";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { t } from "i18next";
 import LottieView from "lottie-react-native";
-import { Authenticator } from "@blockshub/blocksrd";
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Keyboard, KeyboardAvoidingView, ScrollView, View } from "react-native";
 import Reanimated, {
@@ -14,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import OnboardingBackButton from "@/components/onboarding/OnboardingBackButton";
 import OnboardingInput from "@/components/onboarding/OnboardingInput";
+import { ArdAuthenticationError, ArdClient, normalizeArdSchoolId } from "@/services/ard/client";
 import { fetchARDHistory } from "@/services/ard/history";
 import { initializeAccountManager } from "@/services/shared";
 import { useAccountStore } from "@/stores/account";
@@ -71,9 +71,8 @@ export default function TurboSelfLoginWithCredentials() {
   const loginARD = async (submittedSiteId = siteId, submittedUsername = username, submittedPassword = password) => {
     try {
       setIsLoggingIn(true);
-      const authenticator = new Authenticator();
-      // ARD require 2 connections, WHY ?
-      const authentification = await authenticator.fromCredentials(submittedSiteId, submittedUsername, submittedPassword);
+      const schoolId = normalizeArdSchoolId(submittedSiteId);
+      const authentification = await ArdClient.login(schoolId, submittedUsername.trim(), submittedPassword);
       const accountId = uuid();
       const store = useAccountStore.getState();
 
@@ -84,7 +83,7 @@ export default function TurboSelfLoginWithCredentials() {
         id: accountId,
         auth: {
           additionals: {
-            schoolId: submittedSiteId,
+            schoolId,
             password: submittedPassword,
             username: submittedUsername,
             mealPrice: String(mealPrice)
@@ -140,7 +139,12 @@ export default function TurboSelfLoginWithCredentials() {
               return router.push("/");
     } catch (error) {
         setIsLoggingIn(false);
-      Alert.alert(t("Alert_Auth_Error"), t("ONBOARDING_ALERT_LOGIN_ABORTED"));
+      Alert.alert(
+        t("Alert_Auth_Error"),
+        error instanceof ArdAuthenticationError
+          ? error.message
+          : `${t("ONBOARDING_ALERT_LOGIN_ABORTED")}\n\n${String(error)}`
+      );
     }
   };
 

@@ -1,0 +1,15 @@
+diff --git a/node_modules/react-native-mmkv/ios/HybridMMKVPlatformContext.swift b/node_modules/react-native-mmkv/ios/HybridMMKVPlatformContext.swift
+index 0d19d4a..0492459 100644
+--- a/node_modules/react-native-mmkv/ios/HybridMMKVPlatformContext.swift
++++ b/node_modules/react-native-mmkv/ios/HybridMMKVPlatformContext.swift
+@@ -36,7 +36,9 @@ class HybridMMKVPlatformContext: HybridMMKVPlatformContextSpec {
+     }
+     // Get the URL for the AppGroup
+     guard let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) else {
+-      throw RuntimeError.error(withMessage: "Container for AppGroup \"\(appGroupID)\" not accessible")
++      // Re-signed builds (sideloading) often lose the App Group entitlement:
++      // fall back to the app's own Documents/mmkv instead of crashing at launch.
++      return nil
+     }
+     return url.path
+   }

@@ -13,6 +13,8 @@ export interface NotificationPreferences {
   /** Morning digest of the day's courses and homework. */
   dailyDigest: boolean;
   dailyDigestHour: number;
+  /** Mirror the timetable into a "Papillon – Cours" calendar (for the native Calendar widgets). */
+  calendarSync: boolean;
 }
 
 export interface NotificationsState {
@@ -24,11 +26,13 @@ export interface NotificationsState {
   balanceAlerts: Record<string, { amount: number; at: number }>;
   lastCheckAt?: number;
   lastCheckResult?: string;
+  calendarId?: string;
 
   setPreferences: (changes: Partial<NotificationPreferences>) => void;
   setSeen: (kind: "seenGrades" | "seenHomework", accountId: string, keys: string[]) => void;
   setBalanceAlert: (walletKey: string, amount: number | null) => void;
   setLastCheck: (result: string) => void;
+  setCalendarId: (id: string | undefined) => void;
 }
 
 const MAX_SEEN = 1500;
@@ -41,6 +45,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   lowBalanceAmount: 10,
   dailyDigest: false,
   dailyDigestHour: 7,
+  calendarSync: false,
 };
 
 export const useNotificationsStore = create<NotificationsState>()(
@@ -62,6 +67,7 @@ export const useNotificationsStore = create<NotificationsState>()(
           return { balanceAlerts };
         }),
       setLastCheck: result => set({ lastCheckAt: Date.now(), lastCheckResult: result }),
+      setCalendarId: id => set({ calendarId: id }),
     }),
     {
       name: "notifications-storage",

@@ -1,0 +1,112 @@
+name: Build iOS IPA (unsigned, for sideloading)
+
+# Builds an unsigned Papillon.ipa that can be signed on device with Feather,
+# Signulous, AltStore, Sideloadly… Download it from the run's "Artifacts".
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "claude/**"
+      - "sideload/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-ios-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build unsigned IPA
+    if: github.repository != 'PapillonApp/Papillon'
+    runs-on: macos-26
+    timeout-minutes: 150
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select the newest stable Xcode
+        run: |
+          ls -d /Applications/Xcode*.app || true
+          XCODE=$(ls -d /Applications/Xcode_*.app | grep -viE 'beta|rc' | sort -V | tail -1)
+          [ -z "$XCODE" ] && XCODE=/Applications/Xcode.app
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install tools
+        run: |
+          brew install ccache || true
+          gem list cocoapods -i || sudo gem install cocoapods
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Prebuild iOS project
+        env:
+          EXPO_NO_TELEMETRY: "1"
+        run: bunx expo prebuild --platform ios --clean --no-install
+
+      - name: Install pods
+        working-directory: ios
+        run: pod install
+
+      - name: Build archive (no code signing)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -workspace ios/Papillon.xcworkspace \
+            -scheme Papillon \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Papillon.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            archive | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error:|warning: .*deprecated|\*\* (ARCHIVE|BUILD) (SUCCEEDED|FAILED)" || true
+          test -d "$RUNNER_TEMP/Papillon.xcarchive/Products/Applications/Papillon.app"
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: ${{ runner.temp }}/xcodebuild.log
+          if-no-files-found: ignore
+
+      - name: Package IPA
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          SHA=$(git rev-parse --short HEAD)
+          cd "$RUNNER_TEMP"
+          rm -rf Payload && mkdir Payload
+          cp -R Papillon.xcarchive/Products/Applications/Papillon.app Payload/
+          # Leftover signatures from the build would confuse re-signers.
+          find Payload -name "_CodeSignature" -type d -prune -exec rm -rf {} +
+          ls Payload/Papillon.app/PlugIns || true
+          zip -qry "Papillon-$VERSION-$SHA-unsigned.ipa" Payload
+          echo "IPA_PATH=$RUNNER_TEMP/Papillon-$VERSION-$SHA-unsigned.ipa" >> "$GITHUB_ENV"
+          echo "IPA_NAME=Papillon-$VERSION-$SHA-unsigned" >> "$GITHUB_ENV"
+          du -h "Papillon-$VERSION-$SHA-unsigned.ipa"
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IPA_NAME }}
+          path: ${{ env.IPA_PATH }}
+          retention-days: 30
+          compression-level: 0

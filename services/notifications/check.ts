@@ -7,6 +7,7 @@ import { Balance } from "@/services/shared/balance";
 import { Grade } from "@/services/shared/grade";
 import { Homework } from "@/services/shared/homework";
 import { CourseStatus } from "@/services/shared/timetable";
+import { syncTimetableToCalendar } from "@/services/calendarSync";
 import { syncHomeworksToVikunja } from "@/services/vikunja";
 import { useAccountStore } from "@/stores/account";
 import { useNotificationsStore } from "@/stores/notifications";
@@ -282,6 +283,7 @@ export function runNotificationCheck(options: { silent?: boolean; refresh?: bool
     });
     await step("balance", () => checkBalances(manager));
     await step("vikunja", () => syncHomeworksToVikunja(homeworks));
+    await step("calendar", () => syncTimetableToCalendar(manager));
     await step("digest", async () => {
       await scheduleDailyDigest(manager);
       return "ok";

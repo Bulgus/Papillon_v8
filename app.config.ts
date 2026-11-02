@@ -139,6 +139,15 @@ export default {
       // purpose, it would add the push entitlement that sideloading certs lack.
       "expo-background-task",
       [
+        "expo-calendar",
+        {
+          calendarPermission:
+            "Papillon ajoute ton emploi du temps dans un calendrier dédié pour l'afficher dans les widgets Calendrier.",
+          remindersPermission:
+            "Papillon n'utilise pas tes rappels.",
+        },
+      ],
+      [
         "expo-location",
         {
           locationWhenInUsePermission:

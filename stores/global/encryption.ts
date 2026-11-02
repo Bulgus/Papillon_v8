@@ -33,7 +33,9 @@ const isReadable = (json?: string): boolean => {
 };
 
 function mmkvDirectory(): Directory | undefined {
-  if (Platform.OS === "ios") {return Paths.appleSharedContainers[APP_GROUP_ID];}
+  // Same fallback as the patched react-native-mmkv: without the App Group
+  // entitlement (re-signed builds), MMKV lives in Documents/mmkv.
+  if (Platform.OS === "ios") {return Paths.appleSharedContainers[APP_GROUP_ID] ?? new Directory(Paths.document, "mmkv");}
   return new Directory(Paths.document, "mmkv");
 }
 

@@ -10,6 +10,7 @@ import {
   runNotificationCheck,
   sendTestNotification,
 } from "@/services/notifications";
+import { removePapillonCalendar, requestCalendarAccess, syncTimetableToCalendar } from "@/services/calendarSync";
 import { scheduleDailyDigest } from "@/services/notifications/check";
 import { createVikunjaToken, VikunjaClient, VikunjaProject, VikunjaTOTPRequiredError, normalizeVikunjaURL } from "@/services/vikunja/api";
 import { getVikunjaProjects, getVikunjaClient } from "@/services/vikunja";
@@ -153,6 +154,38 @@ function useNotificationsSections(): React.ReactNode[] {
             </List.Trailing>
           </List.Item>
         )}
+      </List.Section>
+
+      <List.Section>
+        <List.SectionTitle>
+          <List.Label>Widget emploi du temps</List.Label>
+        </List.SectionTitle>
+        {toggleRow({
+          icon: "Calendar",
+          title: "Cours dans l'app Calendrier",
+          description: "Copie tes cours des 2 prochaines semaines dans un calendrier « Papillon – Cours » : ajoute le widget Calendrier (écran d'accueil ou verrouillé) pour voir ton EDT du jour. Fonctionne même quand le widget Papillon ne peut pas lire les données (app re-signée).",
+          value: preferences.calendarSync,
+          onValueChange: async value => {
+            if (value) {
+              const granted = await requestCalendarAccess();
+              if (!granted) {
+                Alert.alert(
+                  "Accès au calendrier refusé",
+                  "Autorise l'accès complet au calendrier pour Papillon dans Réglages.",
+                  [{ text: "Annuler", style: "cancel" }, { text: "Ouvrir Réglages", onPress: () => Linking.openSettings() }]
+                );
+                return;
+              }
+              setPreferences({ calendarSync: true });
+              syncTimetableToCalendar()
+                .then(count => Alert.alert("Calendrier", count > 0 ? `${count} cours ajoutés au calendrier « Papillon – Cours ».` : "Ton calendrier est à jour."))
+                .catch(error => Alert.alert("Calendrier", String(error)));
+            } else {
+              setPreferences({ calendarSync: false });
+              await removePapillonCalendar();
+            }
+          },
+        })}
       </List.Section>
 
       <List.Section>

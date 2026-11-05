@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Link, Stack, useTheme } from 'expo-router';
+import { Link, router, Stack, useTheme } from 'expo-router';
 import { t } from 'i18next';
 import type { SFSymbol } from 'sf-symbols-typescript';
 
@@ -22,7 +22,7 @@ import GradesLoading from './atoms/GradesLoading';
 import List from '@/ui/new/List';
 import useResizable from '@/ui/utils/Resizable';
 import CompactGrade from '@/ui/new/CompactGrade';
-import { AndroidHeaderMenu } from '@/components/AndroidHeaderItems';
+import { AndroidHeaderButton, AndroidHeaderMenu } from '@/components/AndroidHeaderItems';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SafeHorizontalView, { SAFE_HORIZONTAL_EDGES } from '@/ui/components/SafeHorizontalView';
 
@@ -95,6 +95,10 @@ const GradesView = () => {
   }, [refreshPeriods, refreshGrades]);
 
   const sortedSubjects = useMemo(() => sortSubjects(subjects, sortMethod), [subjects, sortMethod]);
+
+  const openSimulator = useCallback(() => {
+    router.push({ pathname: '/(tabs)/grades/simulator', params: currentPeriod?.id ? { period: currentPeriod.id } : {} });
+  }, [currentPeriod?.id]);
 
   const filteredSubjects = useMemo(() => {
     if (searchText.trim() === '') { return sortedSubjects; }
@@ -191,20 +195,24 @@ const GradesView = () => {
 
       {isAndroid ? (
         <Stack.Toolbar placement="right" asChild>
-          <AndroidHeaderMenu
-            icon="Filter"
-            accessibilityLabel="Sort by"
-            actions={sortings.map(sorting => ({
-              id: sorting.value,
-              title: sorting.label,
-              papicon: sorting.papicon,
-              state: sortMethod === sorting.value ? 'on' : 'off',
-            }))}
-            onPressAction={({ nativeEvent }) => setSortMethod(nativeEvent.event as SortMethod)}
-          />
+          <View style={{ flexDirection: 'row' }}>
+            <AndroidHeaderButton icon="Coefficient" accessibilityLabel="Simulateur" onPress={openSimulator} />
+            <AndroidHeaderMenu
+              icon="Filter"
+              accessibilityLabel="Sort by"
+              actions={sortings.map(sorting => ({
+                id: sorting.value,
+                title: sorting.label,
+                papicon: sorting.papicon,
+                state: sortMethod === sorting.value ? 'on' : 'off',
+              }))}
+              onPressAction={({ nativeEvent }) => setSortMethod(nativeEvent.event as SortMethod)}
+            />
+          </View>
         </Stack.Toolbar>
       ) : (
         <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button icon="plus.forwardslash.minus" accessibilityLabel="Simulateur" onPress={openSimulator} />
           <Stack.Toolbar.Menu>
             <Stack.Toolbar.Icon sf="line.3.horizontal.decrease" />
             <Stack.Toolbar.Label>Sort by</Stack.Toolbar.Label>

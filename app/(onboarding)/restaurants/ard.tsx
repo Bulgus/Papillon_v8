@@ -86,7 +86,7 @@ export default function TurboSelfLoginWithCredentials() {
             schoolId,
             password: submittedPassword,
             username: submittedUsername,
-            mealPrice: String(mealPrice)
+            mealPrice: String(mealPrice ?? 0)
           },
         },
         serviceId: Services.ARD,

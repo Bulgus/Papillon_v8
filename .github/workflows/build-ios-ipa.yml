@@ -19,15 +19,27 @@ concurrency:
 
 jobs:
   build:
-    name: Build unsigned IPA
+    name: Build unsigned IPA (${{ matrix.variant }})
     if: github.repository != 'PapillonApp/Papillon'
     # PapillonKit (Siri, Apple Intelligence) needs the iOS 27 SDK.
     runs-on: xcode-27
     timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        # "upstream" builds the untouched Papillon release this fork started
+        # from, to tell fork regressions from signing/device problems.
+        variant: [current, upstream]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Switch to upstream Papillon (ab8ffd3)
+        if: matrix.variant == 'upstream'
+        run: git checkout --force ab8ffd3
 
       - name: Select Xcode 27
         run: |
@@ -86,7 +98,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: xcodebuild-log
+          name: xcodebuild-log-${{ matrix.variant }}
           path: ${{ runner.temp }}/xcodebuild.log
           if-no-files-found: ignore
 
@@ -94,6 +106,7 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           SHA=$(git rev-parse --short HEAD)
+          [ "${{ matrix.variant }}" = "upstream" ] && SHA="upstream-$SHA"
           cd "$RUNNER_TEMP"
           rm -rf Payload && mkdir Payload
           cp -R Papillon.xcarchive/Products/Applications/Papillon.app Payload/

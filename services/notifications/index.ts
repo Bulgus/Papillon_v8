@@ -6,31 +6,41 @@ import { Platform } from "react-native";
 
 import { log, warn } from "@/utils/logger/logger";
 
-import { runNotificationCheck } from "./check";
+import type { runNotificationCheck as RunNotificationCheck } from "./check";
 
 export const BACKGROUND_TASK = "papillon-background-refresh";
 
-// Must run at module load (before React mounts) so iOS can wake the app
-// straight into the task.
-TaskManager.defineTask(BACKGROUND_TASK, async () => {
-  try {
-    const result = await runNotificationCheck({ refresh: true });
-    log(`Background refresh done: ${result}`);
-    return BackgroundTask.BackgroundTaskResult.Success;
-  } catch (error) {
-    warn(`Background refresh failed: ${String(error)}`);
-    return BackgroundTask.BackgroundTaskResult.Failed;
-  }
-});
+// The check pulls in the account manager, the database and every service:
+// load it on first use, never while the app is starting up.
+export const runNotificationCheck: typeof RunNotificationCheck = options =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  (require("./check") as typeof import("./check")).runNotificationCheck(options);
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+// Must run at module load (before React mounts) so iOS can wake the app
+// straight into the task. Guarded: a failure here must never stop the app.
+try {
+  TaskManager.defineTask(BACKGROUND_TASK, async () => {
+    try {
+      const result = await runNotificationCheck({ refresh: true });
+      log(`Background refresh done: ${result}`);
+      return BackgroundTask.BackgroundTaskResult.Success;
+    } catch (error) {
+      warn(`Background refresh failed: ${String(error)}`);
+      return BackgroundTask.BackgroundTaskResult.Failed;
+    }
+  });
+
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    }),
+  });
+} catch (error) {
+  warn(`Notifications setup at launch failed: ${String(error)}`);
+}
 
 export async function getNotificationPermission(): Promise<Notifications.PermissionStatus> {
   const { status } = await Notifications.getPermissionsAsync();
@@ -100,5 +110,3 @@ export async function sendTestNotification(): Promise<void> {
     trigger: null,
   });
 }
-
-export { runNotificationCheck };

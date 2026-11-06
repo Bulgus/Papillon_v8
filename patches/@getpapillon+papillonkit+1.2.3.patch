@@ -1,0 +1,121 @@
+diff --git a/node_modules/@getpapillon/papillonkit/ios/Module/LiveActivity/CourseActivityController.swift b/node_modules/@getpapillon/papillonkit/ios/Module/LiveActivity/CourseActivityController.swift
+index 478e2de..77a0120 100644
+--- a/node_modules/@getpapillon/papillonkit/ios/Module/LiveActivity/CourseActivityController.swift
++++ b/node_modules/@getpapillon/papillonkit/ios/Module/LiveActivity/CourseActivityController.swift
+@@ -1,5 +1,6 @@
+ import ActivityKit
+ import Foundation
++import UIKit
+ 
+ struct CourseActivityInstance: Sendable {
+     let id: String
+@@ -58,6 +59,15 @@ final class CourseActivityController {
+         try await enqueue { try await self.performPreview(mode, courseId: courseId, at: Date()) }.value
+     }
+ 
++    /// The app is about to be suspended, so nothing will run when the course
++    /// ends: hand every Live Activity already on screen over to the system,
++    /// which removes it by itself at the end of its course. Ended activities
++    /// leave the Dynamic Island but stay on the Lock Screen until then.
++    @discardableResult
++    func prepareForBackground() async -> CourseActivityStatus {
++        (try? await enqueue { await self.performBackgroundHandoff(at: Date()) }.value) ?? status()
++    }
++
+     @discardableResult
+     func stop() async -> CourseActivityStatus {
+         (try? await enqueue { await self.performStop() }.value) ?? status()
+@@ -106,6 +116,15 @@ final class CourseActivityController {
+         lastSync = now
+         lastError = nil
+ 
++        // Back in the foreground: replace the activities handed over to the
++        // system with live ones again (Dynamic Island, updates). In the
++        // background, keep them, or the course would show twice.
++        let active = UIApplication.shared.applicationState == .active
++        if active {
++            await Self.dismissHandedOff()
++        }
++        let handedOff = active ? Set<String>() : Self.handedOffCourseIds()
++
+         guard settings.enabled, ActivityAuthorizationInfo().areActivitiesEnabled else {
+             planned = 0
+             cancelTimer()
+@@ -116,9 +135,15 @@ final class CourseActivityController {
+         do {
+             let candidates = try CourseActivitySource.candidates(at: now)
+             let plan = CourseActivityPlanner.plan(candidates, at: now)
+-            let wanted = Self.schedulesAhead ? plan : CourseActivityPlanner.due(plan, at: now)
++            let wanted = (Self.schedulesAhead ? plan : CourseActivityPlanner.due(plan, at: now))
++                .filter { !handedOff.contains($0.candidate.id) }
+             planned = wanted.count
+             try await apply(wanted, at: now)
++            if !active {
++                // Synced while in the background (refresh task): nothing will
++                // end what was just shown either, so hand it over right away.
++                await Self.handOff(at: now)
++            }
+             schedule(CourseActivityPlanner.nextTransition(candidates, at: now), from: now)
+         } catch {
+             fail(error)
+@@ -149,6 +174,39 @@ final class CourseActivityController {
+         return status()
+     }
+ 
++    private func performBackgroundHandoff(at now: Date) async -> CourseActivityStatus {
++        await Self.handOff(at: now)
++        return status()
++    }
++
++    private nonisolated static func handOff(at now: Date) async {
++        // ActivityKit keeps an ended activity on screen for at most 4 hours.
++        let latest = now.addingTimeInterval(4 * 60 * 60 - 60)
++        for activity in Activity<CourseActivityAttributes>.activities
++        where activity.activityState == .active && !activity.attributes.preview && activity.attributes.showsAt <= now {
++            let endsAt = activity.content.state.endsAt
++            if endsAt <= now {
++                await activity.end(nil, dismissalPolicy: .immediate)
++            } else {
++                await activity.end(activity.content, dismissalPolicy: .after(min(endsAt, latest)))
++            }
++        }
++    }
++
++    private nonisolated static func dismissHandedOff() async {
++        for activity in Activity<CourseActivityAttributes>.activities where activity.activityState == .ended {
++            await activity.end(nil, dismissalPolicy: .immediate)
++        }
++    }
++
++    private nonisolated static func handedOffCourseIds() -> Set<String> {
++        Set(
++            Activity<CourseActivityAttributes>.activities
++                .filter { $0.activityState == .ended }
++                .map(\.attributes.courseId)
++        )
++    }
++
+     private func performStop() async -> CourseActivityStatus {
+         cancelTimer()
+         planned = 0
+diff --git a/node_modules/@getpapillon/papillonkit/ios/Module/PapillonKitAppDelegate.swift b/node_modules/@getpapillon/papillonkit/ios/Module/PapillonKitAppDelegate.swift
+index 1b456f1..1acc141 100644
+--- a/node_modules/@getpapillon/papillonkit/ios/Module/PapillonKitAppDelegate.swift
++++ b/node_modules/@getpapillon/papillonkit/ios/Module/PapillonKitAppDelegate.swift
+@@ -21,6 +21,16 @@ public final class PapillonKitAppDelegate: ExpoAppDelegateSubscriber {
+             center.addObserver(forName: name, object: nil, queue: .main) { _ in
+                 guard Self.claimBackgroundTransition() else { return }
+                 WidgetRefresher.refresh()
++                if #available(iOS 18.0, *) {
++                    Task { @MainActor in
++                        // A few seconds are enough to hand the activities over.
++                        let task = UIApplication.shared.beginBackgroundTask(withName: "PapillonKit.LiveActivityHandoff")
++                        await CourseActivityController.shared.prepareForBackground()
++                        if task != .invalid {
++                            UIApplication.shared.endBackgroundTask(task)
++                        }
++                    }
++                }
+             }
+         }
+         return true

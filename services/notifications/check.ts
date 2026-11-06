@@ -1,3 +1,4 @@
+import * as PapillonKit from "@getpapillon/papillonkit";
 import * as Notifications from "expo-notifications";
 
 import { getHomeworkRouteId, getWeekNumberFromDate } from "@/database/useHomework";
@@ -284,6 +285,11 @@ export function runNotificationCheck(options: { silent?: boolean; refresh?: bool
     await step("balance", () => checkBalances(manager));
     await step("vikunja", () => syncHomeworksToVikunja(homeworks));
     await step("calendar", () => syncTimetableToCalendar(manager));
+    await step("liveActivity", async () => {
+      // Ends finished course activities and hands the current one to iOS.
+      if (PapillonKit.features.liveActivities) {await PapillonKit.liveActivities.sync();}
+      return "ok";
+    });
     await step("digest", async () => {
       await scheduleDailyDigest(manager);
       return "ok";

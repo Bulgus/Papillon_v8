@@ -39,7 +39,18 @@ export default function Layout() {
         }}
       />
       <Stack.Screen
-        name="simulator"
+        name="simulator/index"
+        options={{
+          headerShown: true,
+          headerTitle: 'Simulateur',
+          headerLargeTitle: false,
+          headerTransparent: runsIOS26,
+          presentation: 'card',
+          ...androidHeaderProps,
+        }}
+      />
+      <Stack.Screen
+        name="simulator/[id]"
         options={{
           headerShown: true,
           headerTitle: 'Simulateur',

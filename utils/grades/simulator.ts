@@ -4,9 +4,12 @@ import { getSubjectAverage } from "./algorithms/subject";
 
 /**
  * Grade simulator: "what if" grades, excluded grades, and the score needed
- * to reach a target. Averages are on /20 and use Papillon's own method
- * (the overall average is the mean of the subject averages), so they are an
- * estimate: the report card may weight subjects differently.
+ * to reach a target. Averages are on /20.
+ *
+ * Results are anchored on the service's own averages (what the Grades tab
+ * shows): with no change the simulator shows exactly them, and each change
+ * moves them by the difference Papillon's calculation gives. Without
+ * anchors, the overall average is the mean of the subject averages.
  */
 
 export interface SimulatedGrade {
@@ -21,6 +24,31 @@ export interface SimulationState {
   simulated: SimulatedGrade[];
   /** Keys of real grades left out of the calculation (see gradeKey). */
   excluded: Set<string>;
+}
+
+/** Official averages (/20) to start from, when the service gives them. */
+export interface Anchors {
+  overall?: number;
+  subjects: Record<string, number>;
+}
+
+export const NO_ANCHORS: Anchors = { subjects: {} };
+const EMPTY: SimulationState = { simulated: [], excluded: new Set() };
+
+/** Service averages of a period, normalised to /20. */
+export function anchorsFrom(subjects: Subject[], overall?: { value: number; disabled?: boolean } | null): Anchors {
+  const result: Anchors = { subjects: {} };
+  for (const subject of subjects) {
+    const score = subject.studentAverage;
+    const outOf = subject.outOf?.value || 20;
+    if (score && !score.disabled && typeof score.value === "number" && score.value >= 0) {
+      result.subjects[subject.id] = (score.value / outOf) * 20;
+    }
+  }
+  if (overall && !overall.disabled && typeof overall.value === "number" && overall.value >= 0) {
+    result.overall = overall.value;
+  }
+  return result;
 }
 
 export const gradeKey = (grade: Grade, index: number) =>
@@ -48,23 +76,54 @@ export function simulatedGradesFor(subject: Subject, state: SimulationState, ext
   return [...real, ...sims];
 }
 
-/** -1 when the subject has no usable grade. */
-export function subjectAverage(subject: Subject, state: SimulationState, extra: SimulatedGrade[] = []): number {
+const clamp = (value: number) => Math.min(20, Math.max(0, value));
+
+/** Papillon's own subject average, -1 when no grade counts. */
+function rawSubjectAverage(subject: Subject, state: SimulationState, extra: SimulatedGrade[] = []): number {
   return getSubjectAverage(simulatedGradesFor(subject, state, extra));
 }
 
-/** Mean of the subject averages, -1 when nothing counts. */
-export function overallAverage(subjects: Subject[], state: SimulationState, extra: SimulatedGrade[] = []): number {
+/** Subject average, anchored on the official one. -1 when nothing counts. */
+export function subjectAverage(
+  subject: Subject,
+  state: SimulationState,
+  extra: SimulatedGrade[] = [],
+  anchors: Anchors = NO_ANCHORS
+): number {
+  const simulated = rawSubjectAverage(subject, state, extra);
+  const anchor = anchors.subjects[subject.id];
+  if (anchor === undefined) {return simulated;}
+  const base = rawSubjectAverage(subject, EMPTY);
+  if (simulated === -1) {return -1;}
+  if (base === -1) {return simulated;}
+  return clamp(anchor + (simulated - base));
+}
+
+function meanOfSubjects(subjects: Subject[], state: SimulationState, extra: SimulatedGrade[], anchors: Anchors): number {
   let total = 0;
   let count = 0;
   for (const subject of subjects) {
-    const average = subjectAverage(subject, state, extra);
+    const average = subjectAverage(subject, state, extra, anchors);
     if (average !== -1) {
       total += average;
       count++;
     }
   }
   return count > 0 ? total / count : -1;
+}
+
+/** Overall average, anchored on the official one. -1 when nothing counts. */
+export function overallAverage(
+  subjects: Subject[],
+  state: SimulationState,
+  extra: SimulatedGrade[] = [],
+  anchors: Anchors = NO_ANCHORS
+): number {
+  const simulated = meanOfSubjects(subjects, state, extra, anchors);
+  if (anchors.overall === undefined || simulated === -1) {return simulated;}
+  const base = meanOfSubjects(subjects, EMPTY, [], anchors);
+  if (base === -1) {return simulated;}
+  return clamp(anchors.overall + (simulated - base));
 }
 
 export type RequiredScore =
@@ -105,9 +164,10 @@ export function requiredForSubject(
   state: SimulationState,
   target: number,
   outOf = 20,
-  coefficient = 1
+  coefficient = 1,
+  anchors: Anchors = NO_ANCHORS
 ): RequiredScore {
-  return solve(extra => subjectAverage(subject, state, extra), subject.id, target, outOf, coefficient);
+  return solve(extra => subjectAverage(subject, state, extra, anchors), subject.id, target, outOf, coefficient);
 }
 
 export function requiredForOverall(
@@ -116,9 +176,10 @@ export function requiredForOverall(
   state: SimulationState,
   target: number,
   outOf = 20,
-  coefficient = 1
+  coefficient = 1,
+  anchors: Anchors = NO_ANCHORS
 ): RequiredScore {
-  return solve(extra => overallAverage(subjects, state, extra), subjectId, target, outOf, coefficient);
+  return solve(extra => overallAverage(subjects, state, extra, anchors), subjectId, target, outOf, coefficient);
 }
 
 /** "15,5" / "15.5" / " 15 " → 15.5; NaN when not a number. */

@@ -30,6 +30,8 @@ interface TaskProps {
   completed: boolean;
   hasAttachments: boolean;
   isCustom?: boolean;
+  /** Comes from Vikunja: shows its icon next to the subject. */
+  isVikunja?: boolean;
   magic?: string;
   onToggle: () => void;
   onPress?: () => void;
@@ -64,6 +66,7 @@ const Task: React.FC<TaskProps> = React.memo(({
   completed,
   hasAttachments,
   isCustom = false,
+  isVikunja = false,
   magic,
   onToggle,
   onPress
@@ -115,6 +118,12 @@ const Task: React.FC<TaskProps> = React.memo(({
               {isCustom && (
                 <Icon size={18} fill={tintedColor}>
                   <Papicons name="PenAlt" />
+                </Icon>
+              )}
+
+              {isVikunja && (
+                <Icon size={18} fill={tintedColor}>
+                  <Papicons name="Tasks" />
                 </Icon>
               )}
             </Stack>

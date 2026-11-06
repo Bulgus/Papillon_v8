@@ -333,8 +333,6 @@ function useVikunjaConnectedSections(): React.ReactNode[] {
       .catch(error => Alert.alert("Vikunja", error instanceof Error ? error.message : String(error)));
   }, [state.connected]);
 
-  const projectOptions = useMemo(() => [{ id: 0, title: "Automatique" }, ...projects], [projects]);
-  const defaultIndex = Math.max(0, projectOptions.findIndex(project => project.id === (state.defaultProjectId ?? 0)));
 
   const syncNow = async () => {
     setSyncing(true);
@@ -366,39 +364,30 @@ function useVikunjaConnectedSections(): React.ReactNode[] {
         <List.SectionTitle>
           <List.Label>Vikunja</List.Label>
         </List.SectionTitle>
-        <List.Item onPress={() => router.push("/(features)/vikunja")}>
-          <List.Leading>
-            <Icon>
-              <Papicons name="Tasks" />
-            </Icon>
-          </List.Leading>
-          <Typography variant="title">Mes tâches Vikunja</Typography>
-          <Typography color="textSecondary">
-            {state.displayName ? `${state.displayName} · ` : ""}{state.baseURL?.replace(/^https?:\/\//, "").replace(/\/api\/v1$/, "")}
-          </Typography>
-        </List.Item>
-        {toggleRow({ icon: "ArrowRightUp", title: "Envoyer les devoirs automatiquement", description: "Chaque nouveau devoir Pronote devient une tâche dans le projet de sa matière.", value: state.autoSync, onValueChange: value => state.update({ autoSync: value }) })}
-        {toggleRow({ icon: "Check", title: "Synchroniser « fait »", description: "Cocher un devoir dans Papillon le coche aussi dans Vikunja.", value: state.syncCompletion, onValueChange: value => state.update({ syncCompletion: value }) })}
-        {toggleRow({ icon: "Home", title: "Afficher dans l'onglet Tâches", description: "Ajoute un raccourci vers tes tâches Vikunja dans l'onglet Tâches.", value: state.showInApp, onValueChange: value => state.update({ showInApp: value }) })}
-        <List.Item>
+        <List.Item onPress={() => router.push("/(settings)/vikunja_subjects")}>
           <List.Leading>
             <Icon>
               <Papicons name="Folder" />
             </Icon>
           </List.Leading>
-          <Typography variant="title">Projet par défaut</Typography>
-          <Typography color="textSecondary" numberOfLines={3}>
-            Utilisé quand aucune matière ne correspond. « Automatique » choisit « Scolaire » puis « Inbox ».
+          <Typography variant="title">Matières et projets</Typography>
+          <Typography color="textSecondary" numberOfLines={2}>
+            Associe chaque matière à un projet Vikunja, ou exclus-la.
           </Typography>
-          <List.Trailing>
-            <View style={{ width: 130, alignItems: "flex-end" }}>
-              <Picker
-                options={projectOptions.map(project => project.title)}
-                selectedIndex={defaultIndex}
-                onValueChange={index => state.update({ defaultProjectId: projectOptions[index].id || undefined })}
-              />
-            </View>
-          </List.Trailing>
+        </List.Item>
+        {toggleRow({ icon: "Tasks", title: "Tâches Vikunja dans l'onglet Tâches", description: "Tes tâches s'affichent avec tes devoirs, au bon jour (et « En retard », « Sans échéance »).", value: state.showInApp, onValueChange: value => state.update({ showInApp: value }) })}
+        {toggleRow({ icon: "ArrowRightUp", title: "Envoyer les devoirs automatiquement", description: "Chaque nouveau devoir Pronote devient une tâche dans le projet de sa matière.", value: state.autoSync, onValueChange: value => state.update({ autoSync: value }) })}
+        {toggleRow({ icon: "Check", title: "Synchroniser « fait »", description: "Cocher un devoir dans Papillon le coche aussi dans Vikunja.", value: state.syncCompletion, onValueChange: value => state.update({ syncCompletion: value }) })}
+        <List.Item onPress={() => router.push("/(features)/vikunja")}>
+          <List.Leading>
+            <Icon>
+              <Papicons name="List" />
+            </Icon>
+          </List.Leading>
+          <Typography variant="title">Toutes mes tâches par projet</Typography>
+          <Typography color="textSecondary">
+            {state.displayName ? `${state.displayName} · ` : ""}{state.baseURL?.replace(/^https?:\/\//, "").replace(/\/api\/v1$/, "")}
+          </Typography>
         </List.Item>
       </List.Section>
       <List.Section>

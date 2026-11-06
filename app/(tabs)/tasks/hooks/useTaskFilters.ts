@@ -76,8 +76,11 @@ export const buildHomeworkSections = (
 
   if (sortMethod === 'date' && !isSearching) {
     const sectionMap = new Map<string, HomeworkSection>();
+    // Vikunja tasks with no due date or overdue from an earlier week.
+    const overdue = data.filter(hw => hw.vikunja?.overdue);
+    const undated = data.filter(hw => hw.vikunja?.undated);
 
-    data.forEach((hw) => {
+    data.filter(hw => !hw.vikunja?.overdue && !hw.vikunja?.undated).forEach((hw) => {
       const hwDate = new Date(hw.dueDate);
       const dateKey = hwDate.toDateString();
       const headerId = `header-${dateKey}`;
@@ -94,7 +97,11 @@ export const buildHomeworkSections = (
       sectionMap.get(dateKey)!.data.push(hw);
     });
 
-    return Array.from(sectionMap.values());
+    return [
+      ...(overdue.length ? [{ id: 'header-overdue', title: 'En retard', data: overdue }] : []),
+      ...Array.from(sectionMap.values()),
+      ...(undated.length ? [{ id: 'header-undated', title: 'Sans échéance', data: undated }] : []),
+    ];
   }
 
   return [

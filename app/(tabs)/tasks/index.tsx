@@ -17,7 +17,8 @@ import type { SFSymbol } from 'sf-symbols-typescript';
 import { TipIds } from '@/constants/Tips';
 import { getDateRangeOfWeek, getWeekNumberFromDate } from '@/database/useHomework';
 import { retireTip } from '@/stores/tips';
-import { useVikunjaStore } from '@/stores/vikunja';
+import { useVikunjaTasksStore } from '@/stores/vikunja/tasks';
+import type { Homework } from '@/services/shared/homework';
 import { useAlert } from "@/ui/components/AlertProvider";
 import Tip from '@/ui/components/Tip';
 import MainTabErrorBoundary from '@/ui/components/MainTabErrorBoundary';
@@ -30,6 +31,7 @@ import { AndroidHeaderButton, AndroidHeaderMenu } from '@/components/AndroidHead
 import TasksWeekPage from './components/TasksWeekPage';
 import WeekPicker from './components/WeekPicker';
 import { useHomeworkData } from './hooks/useHomeworkData';
+import { useVikunjaWeeks } from './hooks/useVikunjaWeeks';
 import { useTaskFilters } from './hooks/useTaskFilters';
 import { useWeekSelection } from './hooks/useWeekSelection';
 import type { SortMethod } from './hooks/useTaskFilters';
@@ -178,6 +180,42 @@ const TasksView: React.FC = () => {
 
   const hasHomeworkError = Boolean(homeworkError) || homeworkFailures.length > 0;
 
+  // Vikunja tasks live in the same week lists as the homework.
+  const vikunja = useVikunjaWeeks(weeksToLoad, defaultWeek);
+  const mergedCache = useRef<Record<number, { hw?: Homework[]; vk?: Homework[]; merged?: Homework[] }>>({});
+  const listForWeek = useCallback((week: number): Homework[] | undefined => {
+    const hw = homeworkByWeek[week];
+    const vk = vikunja.byWeek[week];
+    const cached = mergedCache.current[week];
+    if (cached && cached.hw === hw && cached.vk === vk) {return cached.merged;}
+    const merged = hw === undefined && (!vk || vk.length === 0) ? undefined : [...(hw ?? []), ...(vk ?? [])];
+    mergedCache.current[week] = { hw, vk, merged };
+    return merged;
+  }, [homeworkByWeek, vikunja.byWeek]);
+
+  const setVikunjaDone = useVikunjaTasksStore(state => state.setDone);
+  const setItemDone = useCallback((item: Homework, done: boolean) => {
+    if (item.vikunja) {
+      setVikunjaDone(item.vikunja.taskId, done).catch(err => {
+        alert.showAlert({
+          title: "Vikunja",
+          message: "La tâche n'a pas été mise à jour",
+          description: String(err instanceof Error ? err.message : err),
+          color: "#D60046",
+          icon: "AlertTriangle",
+        });
+      });
+      return;
+    }
+    setAsDone(item, done);
+  }, [setAsDone, setVikunjaDone, alert]);
+
+  const refreshVikunja = vikunja.refresh;
+  const refreshWeek = useCallback((week: number) => {
+    refreshVikunja();
+    return handleRefresh(week);
+  }, [handleRefresh, refreshVikunja]);
+
   const {
     searchTerm,
     setSearchTerm,
@@ -306,8 +344,7 @@ const TasksView: React.FC = () => {
   );
 
   const openNewTask = useCallback(() => router.push("/(modals)/tasks/custom"), []);
-  const showVikunja = useVikunjaStore(state => state.connected && state.showInApp);
-  const openVikunja = useCallback(() => router.push("/(features)/vikunja"), []);
+
 
   const closeWeekPicker = useCallback(() => setShowWeekPicker(false), [setShowWeekPicker]);
 
@@ -361,9 +398,6 @@ const TasksView: React.FC = () => {
       {isAndroid ? (
         <Stack.Toolbar placement="right" asChild>
           <View style={styles.toolbarRow}>
-            {showVikunja && (
-              <AndroidHeaderButton icon="Tasks" accessibilityLabel="Vikunja" onPress={openVikunja} />
-            )}
             <AndroidHeaderButton icon="Plus" accessibilityLabel={t('Task_New_Title')} onPress={openNewTask} />
             <AndroidHeaderMenu
               icon="Filter"
@@ -380,9 +414,6 @@ const TasksView: React.FC = () => {
         </Stack.Toolbar>
       ) : (
         <Stack.Toolbar placement="right">
-          {showVikunja && (
-            <Stack.Toolbar.Button icon="checklist" accessibilityLabel="Vikunja" onPress={openVikunja} />
-          )}
           <Stack.Toolbar.Button icon="plus" accessibilityLabel={t('Task_New_Title')} onPress={openNewTask} />
           <Stack.Toolbar.Menu>
             <Stack.Toolbar.Icon sf="line.3.horizontal.decrease" />
@@ -419,15 +450,15 @@ const TasksView: React.FC = () => {
                   <View style={{ flex: 1, backgroundColor: colors.overground }}>
                     <TasksWeekPage
                       week={week}
-                      homeworks={homeworkByWeek[week]}
+                      homeworks={listForWeek(week)}
                       animateItems={index === INITIAL_INDEX}
                       searchTerm={searchTerm}
                       sortMethod={sortMethod}
                       collapsedGroups={collapsedGroups}
                       toggleGroup={toggleGroup}
                       isRefreshing={refreshingWeek === week}
-                      onRefresh={handleRefresh}
-                      setAsDone={setAsDone}
+                      onRefresh={refreshWeek}
+                      setAsDone={setItemDone}
                       hasError={hasHomeworkError}
                     />
                   </View>

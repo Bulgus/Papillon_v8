@@ -27,6 +27,15 @@ export default function Layout() {
         }}
       />
       <Stack.Screen
+        name="vikunja/[id]"
+        options={{
+          headerTitle: "Tâche Vikunja",
+          headerTransparent: true,
+          headerLargeTitle: false,
+          ...androidHeaderProps,
+        }}
+      />
+      <Stack.Screen
         name="[id]"
         options={{
           headerTitle: t("Modal_Task_Title"),

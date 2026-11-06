@@ -28,6 +28,21 @@ export interface Homework extends GenericInterface{
   custom: boolean;
   progress?: number;
 	ref?: Assignment;
+  /** Set on tasks that come from Vikunja (shown alongside the homework). */
+  vikunja?: VikunjaTaskMeta;
+}
+
+export interface VikunjaTaskMeta {
+  taskId: number;
+  projectId: number;
+  /** "Scolaire › Mathématiques" */
+  projectPath: string;
+  /** #RRGGBB when the task or its project has a colour. */
+  color?: string;
+  /** Subject key the project is matched to, when there is one. */
+  subjectKey?: string;
+  overdue?: boolean;
+  undated?: boolean;
 }
 
 export enum ReturnFormat {

@@ -136,6 +136,14 @@ export default function Layout() {
           }}
         />*/}
         <Stack.Screen
+          name="vikunja_subjects"
+          options={{
+            headerTitle: "Matières et projets",
+            headerBackButtonDisplayMode: "minimal",
+            headerLargeTitle: false,
+          }}
+        />
+        <Stack.Screen
           name="integrations"
           options={{
             headerTitle: "Intégrations",

@@ -45,8 +45,10 @@ export interface VikunjaState {
   autoSync: boolean;
   /** Mirror "done" between Papillon and Vikunja for exported homework. */
   syncCompletion: boolean;
-  /** Show Vikunja tasks in Papillon (Tasks tab button, home widget…). */
+  /** Show Vikunja tasks in Papillon's Tasks tab, next to the homework. */
   showInApp: boolean;
+  /** New tasks from the "+" button go to Vikunja (remembered choice). */
+  newTasksToVikunja: boolean;
   /** homework key → Vikunja task id. */
   exported: Record<string, number>;
   lastSyncAt?: number;
@@ -68,6 +70,7 @@ const initial = {
   autoSync: false,
   syncCompletion: true,
   showInApp: true,
+  newTasksToVikunja: true,
   exported: {},
   lastSyncAt: undefined,
 };

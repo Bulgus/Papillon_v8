@@ -3,6 +3,7 @@ import { Homework } from "@/services/shared/homework";
 import { getVikunjaToken, useVikunjaStore } from "@/stores/vikunja";
 import { warn } from "@/utils/logger/logger";
 import { getSubjectName } from "@/utils/subjects/name";
+import { cleanSubjectName } from "@/utils/subjects/utils";
 import { findSchoolRootProject, matchProjectForSubject, normalizeSubject } from "@/utils/vikunja/match";
 
 import { VikunjaClient, VikunjaProject } from "./api";
@@ -29,21 +30,70 @@ export async function getVikunjaProjects(force = false): Promise<VikunjaProject[
   return projects;
 }
 
-/** Override › automatic subject match › default project › "Scolaire" › Inbox. */
-export function resolveProjectForSubject(subject: string, projects: VikunjaProject[]): VikunjaProject | null {
+/** Stored in subjectProjects: never send this subject to Vikunja automatically. */
+export const SUBJECT_NOT_SYNCED = -1;
+
+/** Key of a subject in the mapping: the same key as the account's subject customisation. */
+export const subjectKey = (subject: string) => cleanSubjectName(subject);
+
+export type SubjectProjectSource = "manual" | "auto" | "fallback" | "excluded";
+
+/**
+ * Project a subject goes to, and why:
+ * manual choice › automatic name match › default project › "Scolaire" › Inbox.
+ */
+export function resolveSubjectProject(
+  subject: string,
+  projects: VikunjaProject[]
+): { project: VikunjaProject | null; source: SubjectProjectSource } {
   const { subjectProjects, defaultProjectId } = useVikunjaStore.getState();
   const byId = (id?: number) => (id ? projects.find(project => project.id === id) ?? null : null);
 
-  return (
-    byId(subjectProjects[normalizeSubject(subject)]) ??
-    matchProjectForSubject(getSubjectName(subject), projects) ??
-    matchProjectForSubject(subject, projects) ??
+  const manual = subjectProjects[subjectKey(subject)] ?? subjectProjects[normalizeSubject(subject)];
+  if (manual === SUBJECT_NOT_SYNCED) {return { project: null, source: "excluded" };}
+  const chosen = byId(manual);
+  if (chosen) {return { project: chosen, source: "manual" };}
+
+  const auto = matchProjectForSubject(getSubjectName(subject), projects) ?? matchProjectForSubject(subject, projects);
+  if (auto) {return { project: auto, source: "auto" };}
+
+  const fallback =
     byId(defaultProjectId) ??
+    findSchoolRootProject(projects) ??
+    projects.find(project => project.title.toLowerCase() === "inbox") ??
+    projects[0] ??
+    null;
+  return { project: fallback, source: "fallback" };
+}
+
+/** Where a subject's homework goes; when the subject is excluded, the default project. */
+export function resolveProjectForSubject(subject: string, projects: VikunjaProject[]): VikunjaProject | null {
+  const resolved = resolveSubjectProject(subject, projects);
+  if (resolved.source !== "excluded") {return resolved.project;}
+  const { defaultProjectId } = useVikunjaStore.getState();
+  return (
+    projects.find(project => project.id === defaultProjectId) ??
     findSchoolRootProject(projects) ??
     projects.find(project => project.title.toLowerCase() === "inbox") ??
     projects[0] ??
     null
   );
+}
+
+/**
+ * Project id → subject key, for the projects a subject was explicitly or
+ * automatically matched to (not the fallback ones): lets a Vikunja task wear
+ * its subject's name, emoji and colour.
+ */
+export function projectSubjectMap(subjectKeys: string[], projects: VikunjaProject[]): Map<number, string> {
+  const map = new Map<number, string>();
+  for (const key of subjectKeys) {
+    const { project, source } = resolveSubjectProject(key, projects);
+    if (project && (source === "manual" || source === "auto") && !map.has(project.id)) {
+      map.set(project.id, key);
+    }
+  }
+  return map;
 }
 
 function stripHTML(html: string): string {
@@ -142,6 +192,8 @@ export async function syncHomeworksToVikunja(homeworks: Homework[]): Promise<num
     today.setHours(0, 0, 0, 0);
     for (const homework of homeworks) {
       if (homework.custom || homework.isDone) {continue;}
+      // Subjects the user chose to keep out of Vikunja.
+      if (useVikunjaStore.getState().subjectProjects[subjectKey(homework.subject)] === SUBJECT_NOT_SYNCED) {continue;}
       if (new Date(homework.dueDate).getTime() < today.getTime()) {continue;}
       if (isHomeworkExported(homework)) {continue;}
       try {

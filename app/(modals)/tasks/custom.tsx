@@ -3,7 +3,7 @@ import DateTimePicker, { DateTimePickerAndroid } from "@react-native-community/d
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useTheme } from "expo-router/react-navigation";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   KeyboardAvoidingView,
@@ -17,6 +17,11 @@ import Reanimated, { useSharedValue, withSpring, withTiming } from "react-native
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { saveCustomHomework } from "@/database/useHomework";
+import { getVikunjaProjects, resolveProjectForSubject } from "@/services/vikunja";
+import { VikunjaProject } from "@/services/vikunja/api";
+import { useVikunjaStore } from "@/stores/vikunja";
+import { useVikunjaTasksStore } from "@/stores/vikunja/tasks";
+import NativeSwitch from "@/ui/native/NativeSwitch";
 import { Homework } from "@/services/shared/homework";
 import { useAccountStore } from "@/stores/account";
 import { CustomisableSubject } from "@/stores/account/types";
@@ -266,6 +271,27 @@ const NewTaskModal = () => {
   const [taskDone, setTaskDone] = useState<boolean>(local.done === "1");
   const [saving, setSaving] = useState(false);
 
+  // New tasks can go straight to Vikunja, in the project of their subject.
+  const vikunjaConnected = useVikunjaStore(state => state.connected);
+  const rememberedToVikunja = useVikunjaStore(state => state.newTasksToVikunja);
+  const updateVikunja = useVikunjaStore(state => state.update);
+  const createVikunjaTask = useVikunjaTasksStore(state => state.create);
+  const canUseVikunja = vikunjaConnected && !isEditing;
+  const [toVikunja, setToVikunja] = useState(rememberedToVikunja);
+  const [vikunjaProjects, setVikunjaProjects] = useState<VikunjaProject[]>([]);
+  useEffect(() => {
+    if (canUseVikunja) {getVikunjaProjects().then(setVikunjaProjects).catch(() => undefined);}
+  }, [canUseVikunja]);
+  const vikunjaProject = useMemo(
+    () => (selectedSubject && vikunjaProjects.length ? resolveProjectForSubject(selectedSubject.id, vikunjaProjects) : null),
+    [selectedSubject, vikunjaProjects]
+  );
+  const vikunjaProjectPath = useMemo(() => {
+    if (!vikunjaProject) {return null;}
+    const parent = vikunjaProjects.find(project => project.id === vikunjaProject.parent_project_id);
+    return parent ? `${parent.title} › ${vikunjaProject.title}` : vikunjaProject.title;
+  }, [vikunjaProject, vikunjaProjects]);
+
   const disabled = !selectedSubject || taskDescription.trim() === "" || !account || saving;
 
   const save = async () => {
@@ -287,6 +313,19 @@ const NewTaskModal = () => {
 
     setSaving(true);
     try {
+      if (canUseVikunja && toVikunja && vikunjaProject) {
+        const [title, ...rest] = taskDescription.trim().split("\n");
+        const due = new Date(selectedDate);
+        due.setHours(18, 0, 0, 0);
+        const created = await createVikunjaTask(vikunjaProject.id, {
+          title: title.trim(),
+          description: rest.join("<br>").trim(),
+          dueDate: due,
+        });
+        if (!created) {throw new Error("Vikunja n'est pas connecté.");}
+        router.back();
+        return;
+      }
       await saveCustomHomework(homework, local.replacedId);
       router.back();
     } catch (err) {
@@ -473,6 +512,38 @@ const NewTaskModal = () => {
               onChangeText={setDescription}
             />
           </Stack>
+          {canUseVikunja && (
+            <Stack
+              direction="horizontal"
+              vAlign="center"
+              gap={12}
+              style={{
+                marginHorizontal: 16,
+                padding: 15,
+                borderRadius: 25,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.card,
+              }}
+            >
+              <Papicons name={"Tasks"} color={accent} size={22} />
+              <View style={{ flex: 1 }}>
+                <Typography variant="title">Ajouter dans Vikunja</Typography>
+                <Typography color="secondary" variant="body2" numberOfLines={2}>
+                  {toVikunja
+                    ? vikunjaProjectPath ? `Dans ${vikunjaProjectPath} · 1re ligne = titre` : "Chargement des projets…"
+                    : "Tâche gardée dans Papillon uniquement"}
+                </Typography>
+              </View>
+              <NativeSwitch
+                value={toVikunja}
+                onValueChange={value => {
+                  setToVikunja(value);
+                  updateVikunja({ newTasksToVikunja: value });
+                }}
+              />
+            </Stack>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </>

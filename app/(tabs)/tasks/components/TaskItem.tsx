@@ -28,7 +28,15 @@ const TaskItem = memo(
     setAsDone
   }: TaskItemProps) => {
     const cleanContent = useMemo(() => item.content.replace(/<[^>]*>/g, ""), [item.content]);
-    const magic = useMagicPrediction(cleanContent);
+    const magic = useMagicPrediction(item.vikunja ? "" : cleanContent);
+
+    // A Vikunja task wears its subject's look when its project is matched to
+    // one; otherwise its project's name and colour (never registered as a
+    // subject, so it does not end up in the subject settings).
+    const meta = item.vikunja;
+    const display = meta && !meta.subjectKey
+      ? { name: meta.projectPath, emoji: "📋", color: meta.color ?? "#5B6CF0" }
+      : { name: getSubjectName(item.subject), emoji: getSubjectEmoji(item.subject), color: getSubjectColor(item.subject) };
 
     return (
       <Reanimated.View
@@ -37,22 +45,22 @@ const TaskItem = memo(
         exiting={animated ? PapillonAppearOut : undefined}
       >
         <Link
-          href={{
-            pathname: "/(tabs)/tasks/[id]",
-            params: { id: getHomeworkRouteId(item) },
-          }}
+          href={meta
+            ? { pathname: "/(tabs)/tasks/vikunja/[id]", params: { id: String(meta.taskId) } }
+            : { pathname: "/(tabs)/tasks/[id]", params: { id: getHomeworkRouteId(item) } }}
           asChild
         >
           <Task
-            subject={getSubjectName(item.subject)}
-            emoji={getSubjectEmoji(item.subject)}
+            subject={display.name}
+            emoji={display.emoji}
             title={""}
-            color={getSubjectColor(item.subject)}
+            color={display.color}
             description={item.content}
             date={new Date(item.dueDate)}
             completed={item.isDone}
             hasAttachments={item.attachments.length > 0}
             isCustom={item.custom}
+            isVikunja={Boolean(meta)}
             magic={magic}
             onToggle={() => setAsDone(item, !item.isDone)}
           />

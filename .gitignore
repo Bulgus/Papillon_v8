@@ -50,7 +50,6 @@ android/*
 !android/app/src/main/
 !android/app/src/main/AndroidManifest.xml
 
-bun.lock
 yarn.lock
 
 secrets.json

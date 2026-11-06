@@ -85,6 +85,9 @@ jobs:
             archive | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error:|warning: .*deprecated|\*\* (ARCHIVE|BUILD) (SUCCEEDED|FAILED)" || true
           test -d "$RUNNER_TEMP/Papillon.xcarchive/Products/Applications/Papillon.app"
 
+      - name: Check dynamic linking (launch crash guard)
+        run: python3 scripts/ios-link-check.py "$RUNNER_TEMP/Papillon.xcarchive/Products/Applications/Papillon.app"
+
       - name: Upload build log on failure
         if: failure()
         uses: actions/upload-artifact@v4

@@ -35,7 +35,7 @@ const HomeHeader = () => {
       icon: "cutlery",
       color: "#46c700",
       description: t("Home_Menu_Button_Description"),
-      route: "/(features)/soon"
+      route: "/(features)/menu"
     },
     {
       title: t("Home_Attendance_Title"),

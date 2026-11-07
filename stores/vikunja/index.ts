@@ -49,6 +49,8 @@ export interface VikunjaState {
   showInApp: boolean;
   /** New tasks from the "+" button go to Vikunja (remembered choice). */
   newTasksToVikunja: boolean;
+  /** Tasks tab filter: everything, school homework only, or Vikunja only. */
+  tasksSource: "all" | "school" | "vikunja";
   /** homework key → Vikunja task id. */
   exported: Record<string, number>;
   lastSyncAt?: number;
@@ -71,6 +73,7 @@ const initial = {
   syncCompletion: true,
   showInApp: true,
   newTasksToVikunja: true,
+  tasksSource: "all" as const,
   exported: {},
   lastSyncAt: undefined,
 };

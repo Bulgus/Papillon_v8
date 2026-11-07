@@ -119,6 +119,42 @@ function extractGecData(html: string): ArdGecData | null {
   }
 }
 
+interface HttpResponse {
+  status: number;
+  ok: boolean;
+  headers: { get(name: string): string | null };
+  text(): Promise<string>;
+}
+
+type HttpFetch = (url: string, init: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<HttpResponse>;
+
+/**
+ * On iOS, React Native's fetch leaves cookies to the system cookie jar and
+ * does not hand HttpOnly Set-Cookie headers to JS, so the portal's session
+ * cookie (fe_typo_user, HttpOnly) was lost after login. expo-fetcher's native
+ * fetch never touches the jar and returns every Set-Cookie: cookies are then
+ * handled here, like on a server. Plain fetch elsewhere (tests).
+ */
+let httpFetch: HttpFetch | null = null;
+function getHttpFetch(): HttpFetch {
+  if (httpFetch) {return httpFetch;}
+  const isReactNative = typeof navigator !== "undefined" && (navigator as { product?: string }).product === "ReactNative";
+  if (isReactNative) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const native = require("expo-fetcher") as { fetch?: HttpFetch };
+      if (native?.fetch) {
+        httpFetch = native.fetch;
+        return httpFetch;
+      }
+    } catch {
+      // module unavailable: fall back to fetch
+    }
+  }
+  httpFetch = (url, init) => fetch(url, { ...init, credentials: "omit" }) as Promise<HttpResponse>;
+  return httpFetch;
+}
+
 function isLoggedIn(html: string): boolean {
   return html.includes("logintype=logout") && !html.includes("name=\"pass\"");
 }
@@ -145,7 +181,7 @@ export class ArdClient {
     return client;
   }
 
-  private storeCookies(response: Response) {
+  private storeCookies(response: HttpResponse) {
     const header = response.headers.get("set-cookie");
     if (!header) {return;}
     // Several cookies may be folded in a single header, separated by commas.
@@ -162,20 +198,31 @@ export class ArdClient {
     return [...this.cookies.entries()].map(([k, v]) => `${k}=${v}`).join("; ");
   }
 
-  private async request(url: string, init: RequestInit = {}): Promise<Response> {
+  private async request(
+    url: string,
+    init: { method?: string; headers?: Record<string, string>; body?: string } = {}
+  ): Promise<HttpResponse> {
     const headers: Record<string, string> = {
       "User-Agent": USER_AGENT,
-      ...(init.headers as Record<string, string> | undefined),
+      "Cache-Control": "no-cache",
+      ...(init.headers ?? {}),
     };
     const cookie = this.cookieHeader();
     if (cookie) {headers.Cookie = cookie;}
-    const response = await fetch(url.startsWith("http") ? url : HOST + url, {
-      ...init,
+    const response = await getHttpFetch()(url.startsWith("http") ? url : HOST + url, {
+      method: init.method ?? "GET",
       headers,
-      credentials: "include",
+      body: init.body,
     });
     this.storeCookies(response);
     return response;
+  }
+
+  /** Short description of the session state, for error messages. */
+  private describeSession(status: number, html: string): string {
+    const names = [...this.cookies.keys()].join(",") || "aucun cookie";
+    const state = isLoggedIn(html) ? "connecté" : html.includes("name=\"pass\"") ? "page de connexion" : "page inattendue";
+    return `HTTP ${status}, ${state}, ${names}`;
   }
 
   async login(): Promise<void> {
@@ -243,7 +290,8 @@ export class ArdClient {
 
   /** Fetch a page and re-login once if the session expired. */
   private async fetchGecData(page: string, retry = true): Promise<ArdGecData> {
-    const html = await (await this.request(this.pageUrl(page))).text();
+    const response = await this.request(this.pageUrl(page));
+    const html = await response.text();
     const data = extractGecData(html);
     if (data?.user?.uid) {
       this.user = data.user;
@@ -253,7 +301,7 @@ export class ArdClient {
       await this.login();
       return this.fetchGecData(page, false);
     }
-    throw new Error("Session ARD invalide.");
+    throw new Error(`Session ARD invalide (${this.describeSession(response.status, html)}).`);
   }
 
   private async fetchJson<T>(eid: string, query: Record<string, string | number>, retry = true): Promise<T> {

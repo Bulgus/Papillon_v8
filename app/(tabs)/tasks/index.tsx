@@ -17,6 +17,7 @@ import type { SFSymbol } from 'sf-symbols-typescript';
 import { TipIds } from '@/constants/Tips';
 import { getDateRangeOfWeek, getWeekNumberFromDate } from '@/database/useHomework';
 import { retireTip } from '@/stores/tips';
+import { useVikunjaStore } from '@/stores/vikunja';
 import { useVikunjaTasksStore } from '@/stores/vikunja/tasks';
 import type { Homework } from '@/services/shared/homework';
 import { useAlert } from "@/ui/components/AlertProvider";
@@ -183,15 +184,26 @@ const TasksView: React.FC = () => {
   // Vikunja tasks live in the same week lists as the homework.
   const vikunja = useVikunjaWeeks(weeksToLoad, defaultWeek);
   const mergedCache = useRef<Record<number, { hw?: Homework[]; vk?: Homework[]; merged?: Homework[] }>>({});
+  const storedSource = useVikunjaStore(state => state.tasksSource);
+  const updateVikunja = useVikunjaStore(state => state.update);
+  // The filter only means something when Vikunja tasks are shown.
+  const source = vikunja.enabled ? storedSource : "all";
   const listForWeek = useCallback((week: number): Homework[] | undefined => {
-    const hw = homeworkByWeek[week];
-    const vk = vikunja.byWeek[week];
+    const hw = source === "vikunja" ? [] : homeworkByWeek[week];
+    const vk = source === "school" ? [] : vikunja.byWeek[week];
     const cached = mergedCache.current[week];
     if (cached && cached.hw === hw && cached.vk === vk) {return cached.merged;}
-    const merged = hw === undefined && (!vk || vk.length === 0) ? undefined : [...(hw ?? []), ...(vk ?? [])];
+    const loaded = source === "vikunja" ? true : homeworkByWeek[week] !== undefined;
+    const merged = !loaded && (!vk || vk.length === 0) ? undefined : [...(hw ?? []), ...(vk ?? [])];
     mergedCache.current[week] = { hw, vk, merged };
     return merged;
-  }, [homeworkByWeek, vikunja.byWeek]);
+  }, [homeworkByWeek, vikunja.byWeek, source]);
+
+  const sources = [
+    { value: "all" as const, label: "Tout afficher", sf: "square.stack" as SFSymbol, papicon: "List" },
+    { value: "school" as const, label: "Devoirs seulement", sf: "graduationcap" as SFSymbol, papicon: "GraduationHat" },
+    { value: "vikunja" as const, label: "Vikunja seulement", sf: "checklist" as SFSymbol, papicon: "Tasks" },
+  ];
 
   const setVikunjaDone = useVikunjaTasksStore(state => state.setDone);
   const setItemDone = useCallback((item: Homework, done: boolean) => {
@@ -402,13 +414,27 @@ const TasksView: React.FC = () => {
             <AndroidHeaderMenu
               icon="Filter"
               accessibilityLabel={t('Task_Sorting_Title')}
-              actions={sortings.map(sorting => ({
-                id: sorting.value,
-                title: sorting.label,
-                papicon: sorting.papicon,
-                state: sortMethod === sorting.value ? 'on' : 'off',
-              }))}
-              onPressAction={({ nativeEvent }) => setSortMethod(nativeEvent.event as SortMethod)}
+              actions={[
+                ...sortings.map(sorting => ({
+                  id: sorting.value,
+                  title: sorting.label,
+                  papicon: sorting.papicon,
+                  state: sortMethod === sorting.value ? 'on' as const : 'off' as const,
+                })),
+                ...(vikunja.enabled ? sources.map(item => ({
+                  id: `source:${item.value}`,
+                  title: item.label,
+                  papicon: item.papicon,
+                  state: source === item.value ? 'on' as const : 'off' as const,
+                })) : []),
+              ]}
+              onPressAction={({ nativeEvent }) => {
+                if (nativeEvent.event.startsWith('source:')) {
+                  updateVikunja({ tasksSource: nativeEvent.event.slice(7) as typeof source });
+                } else {
+                  setSortMethod(nativeEvent.event as SortMethod);
+                }
+              }}
             />
           </View>
         </Stack.Toolbar>
@@ -426,6 +452,16 @@ const TasksView: React.FC = () => {
                 onPress={() => setSortMethod(sorting.value)}
               >
                 {sorting.label}
+              </Stack.Toolbar.MenuAction>
+            ))}
+            {vikunja.enabled && sources.map(item => (
+              <Stack.Toolbar.MenuAction
+                key={`source-${item.value}`}
+                isOn={source === item.value}
+                icon={item.sf}
+                onPress={() => updateVikunja({ tasksSource: item.value })}
+              >
+                {item.label}
               </Stack.Toolbar.MenuAction>
             ))}
           </Stack.Toolbar.Menu>

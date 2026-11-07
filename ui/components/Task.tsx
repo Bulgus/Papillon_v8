@@ -4,7 +4,7 @@ import Typography from './Typography';
 import { formatHTML } from '@/utils/format/html';
 import { useTheme } from "expo-router/react-navigation";
 import adjust from '@/utils/adjustColor';
-import { Text } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { formatDistanceStrict, startOfDay } from 'date-fns';
 import * as DateLocale from 'date-fns/locale';
@@ -122,9 +122,21 @@ const Task: React.FC<TaskProps> = React.memo(({
               )}
 
               {isVikunja && (
-                <Icon size={18} fill={tintedColor}>
-                  <Papicons name="Tasks" />
-                </Icon>
+                <View
+                  style={{
+                    backgroundColor: tintedColor + "1F",
+                    borderColor: tintedColor + "40",
+                    borderWidth: 1,
+                    borderRadius: 100,
+                    paddingHorizontal: 7,
+                    paddingVertical: 1,
+                    flexShrink: 0,
+                  }}
+                >
+                  <Typography nowrap variant='caption' weight='semibold' color={tintedColor}>
+                    Vikunja
+                  </Typography>
+                </View>
               )}
             </Stack>
             {/* Date */}

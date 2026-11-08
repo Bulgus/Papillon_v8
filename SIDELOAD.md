@@ -2,12 +2,11 @@
 
 ## Récupérer l'IPA
 
-Chaque push sur une branche `claude/**` ou `sideload/**` lance le workflow
-**Build iOS IPA** (`.github/workflows/build-ios-ipa.yml`). Il est aussi
-lançable à la main depuis l'onglet *Actions* (« Run workflow »).
-
-À la fin du run, l'IPA **non signée** est dans *Artifacts*
-(`Papillon-<version>-<commit>-unsigned`). Le zip téléchargé contient le `.ipa`.
+Chaque push lance le workflow **Feather** (`.github/workflows/feather.yml`) :
+build non signé (Xcode 27), contrôle anti-crash de l'édition de liens, puis
+publication sur la source Feather (`Bulgus/feather-repo`, `source.json`) et
+notification ntfy. La première ligne du message de commit s'affiche dans
+Feather pour distinguer les builds.
 
 ## Signer avec Feather
 

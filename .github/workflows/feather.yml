@@ -1,9 +1,10 @@
 name: Feather
 
-# Builds Papillon (Expo) unsigned and publishes it to Aimé's Feather source
-# (Bulgus/feather-repo), like feather-repo's reusable publish.yml does, which
-# cannot build an Expo app: it needs bun, expo prebuild, CocoaPods and the
-# iOS 27 SDK. Feather signs the IPA on install.
+# Builds Papillon (Expo) unsigned, then hands the IPA to feather-repo's
+# publish-ipa.yml, which publishes it to Aimé's Feather source (release,
+# source.json, ntfy). The build stays here rather than in publish.yml because
+# of the launch-crash guard, which inspects the built app after xcodebuild.
+# Feather signs the IPA on install.
 
 on: [push, workflow_dispatch]
 
@@ -16,18 +17,33 @@ concurrency:
 
 jobs:
   build:
-    name: Build and publish to Feather
+    name: Build unsigned IPA
     if: github.repository != 'PapillonApp/Papillon'
     # PapillonKit (Siri, Apple Intelligence) needs the iOS 27 SDK.
     runs-on: xcode-27
     timeout-minutes: 150
-    env:
-      SCHEME: Papillon
-      BUNDLE_ID: xyz.getpapillon.ios
-      APP_NAME: Papillon
-      FEATHER_REPO: Bulgus/feather-repo
+    outputs:
+      version: ${{ steps.ipa.outputs.version }}
+      build: ${{ steps.ipa.outputs.build }}
 
     steps:
+      # Personal repo: the organisation secrets do not apply. Only says whether
+      # they are set, never their value.
+      - name: Check Feather secrets
+        env:
+          HAS_TOKEN: ${{ secrets.FEATHER_TOKEN != '' }}
+          HAS_NTFY: ${{ secrets.NTFY_URL != '' }}
+        run: |
+          echo "FEATHER_TOKEN set: $HAS_TOKEN · NTFY_URL set: $HAS_NTFY"
+          {
+            echo "### Feather secrets"
+            echo "- FEATHER_TOKEN: $HAS_TOKEN"
+            echo "- NTFY_URL (optionnel): $HAS_NTFY"
+          } >> "$GITHUB_STEP_SUMMARY"
+          [ "$HAS_TOKEN" = "true" ] || echo "::warning::FEATHER_TOKEN missing: add it in Settings › Secrets and variables › Actions"
+          # NTFY_URL is optional: without it the build is published, just not notified.
+          [ "$HAS_NTFY" = "true" ] || echo "::notice::NTFY_URL not set (optional): published without ntfy notification"
+
       - name: Checkout
         uses: actions/checkout@v5
 
@@ -100,6 +116,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Package IPA
+        id: ipa
         run: |
           BUILD=${{ github.run_number }}
           APP_PATH="$RUNNER_TEMP/Papillon.xcarchive/Products/Applications/Papillon.app"
@@ -109,64 +126,24 @@ jobs:
           cp -R "$APP_PATH" Payload/
           # Leftover signatures from the build would confuse re-signers.
           find Payload -name "_CodeSignature" -type d -prune -exec rm -rf {} +
-          IPA="$SCHEME-$VER-$BUILD.ipa"
-          zip -qry "$IPA" Payload
-          du -h "$IPA"
-          {
-            echo "VER=$VER"; echo "BUILD=$BUILD"
-            echo "IPA=$RUNNER_TEMP/$IPA"; echo "IPA_FILE=$IPA"
-            echo "TAG=$SCHEME-$VER-$BUILD"
-          } >> "$GITHUB_ENV"
+          zip -qry app.ipa Payload
+          du -h app.ipa
+          { echo "version=$VER"; echo "build=$BUILD"; } >> "$GITHUB_OUTPUT"
 
-      - name: Upload IPA as release
-        env:
-          GH_TOKEN: ${{ secrets.FEATHER_TOKEN }}
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
-        run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "::error::Secret FEATHER_TOKEN unavailable for this repository"
-            exit 1
-          fi
-          MSG="[${GITHUB_REF_NAME}] $(echo "${COMMIT_MSG:-build manuel}" | head -1)"
-          echo "MSG=$MSG" >> "$GITHUB_ENV"
-          gh release create "$TAG" "$IPA" --repo "$FEATHER_REPO" \
-            --title "$APP_NAME $VER ($BUILD)" --notes "$MSG"
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipa
+          path: ${{ runner.temp }}/app.ipa
+          retention-days: 1
+          compression-level: 0
 
-      - name: Update source.json
-        env:
-          GH_TOKEN: ${{ secrets.FEATHER_TOKEN }}
-        run: |
-          SIZE=$(stat -f%z "$IPA")
-          URL="https://github.com/$FEATHER_REPO/releases/download/$TAG/$IPA_FILE"
-          git clone -q "https://x-access-token:$GH_TOKEN@github.com/$FEATHER_REPO.git" "$RUNNER_TEMP/feather"
-          cd "$RUNNER_TEMP/feather"
-          git config user.name "github-actions"
-          git config user.email "github-actions@users.noreply.github.com"
-
-          update() {
-            jq --arg id "$BUNDLE_ID" --arg name "$APP_NAME" \
-               --arg v "$VER.$BUILD" --arg b "$BUILD" --arg d "$(date -u +%FT%TZ)" \
-               --arg u "$URL" --argjson s "$SIZE" --arg m "$MSG" '
-              (if any(.apps[]; .bundleIdentifier == $id) then .
-               else .apps += [{name:$name, bundleIdentifier:$id, developerName:"Aimé",
-                               localizedDescription:$name, versions:[]}] end)
-              | (.apps[] | select(.bundleIdentifier == $id) | .versions) |=
-                  ([{version:$v, buildVersion:$b, date:$d, downloadURL:$u,
-                     size:$s, localizedDescription:$m}] + . | .[:10])
-            ' source.json > tmp.json && mv tmp.json source.json
-          }
-
-          for i in 1 2 3; do
-            update
-            git commit -qam "$APP_NAME $VER ($BUILD)"
-            git push -q && break
-            git reset -q --hard HEAD~1 && git pull -q --rebase
-          done
-
-      - name: Notify (ntfy)
-        continue-on-error: true
-        env:
-          NTFY_URL: ${{ secrets.NTFY_URL }}
-        run: |
-          [ -n "$NTFY_URL" ] && curl -s -H "Title: $APP_NAME $VER ($BUILD)" \
-            -d "$MSG — dispo dans Feather" "$NTFY_URL" || true
+  publish:
+    needs: build
+    uses: Bulgus/feather-repo/.github/workflows/publish-ipa.yml@main
+    with:
+      bundle_id: xyz.getpapillon.ios
+      app_name: Papillon
+      version: ${{ needs.build.outputs.version }}
+      build: ${{ needs.build.outputs.build }}
+    secrets: inherit

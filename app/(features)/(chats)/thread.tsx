@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getManager } from "@/services/shared";
 import { Message } from "@/services/shared/chat";
+import { Capabilities } from "@/services/shared/types";
 import { useAccountStore } from "@/stores/account";
 import { chatKey, useChatsStore } from "@/stores/chats";
 import Avatar from "@/ui/components/Avatar";
@@ -65,6 +66,7 @@ export default function ChatThread() {
   const [refreshing, setRefreshing] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!chat) {return;}
@@ -73,6 +75,11 @@ export default function ChatThread() {
     try {
       const result = await manager.getChatMessages(chat);
       setMessages([...(result ?? [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+      // The manager falls back to the cache on failure: say why when empty.
+      const failure = manager.getFailures(Capabilities.CHAT_READ)[0];
+      setLoadError((result ?? []).length === 0 && failure
+        ? String(failure.reason instanceof Error ? failure.reason.message : failure.reason)
+        : null);
       // Reading the messages marks them as read on Pronote.
       markRead(chatKey(chat));
     } catch (error) {
@@ -176,7 +183,7 @@ export default function ChatThread() {
 
           {!loading && messages.length === 0 && (
             <Typography color="textSecondary" align="center" style={{ marginTop: 24 }}>
-              Aucun message à afficher (hors connexion ?).
+              {loadError ? `Impossible de charger les messages : ${loadError}` : "Aucun message à afficher."}
             </Typography>
           )}
 

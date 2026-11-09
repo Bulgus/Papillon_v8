@@ -14,6 +14,19 @@ import {
 import { Chat, Message, Recipient } from "@/services/shared/chat";
 import { error } from "@/utils/logger/logger";
 
+/**
+ * Messaging is an account-level tab: it is listed in the user's
+ * authorizations, never in a resource's `tabs` (those only hold the tabs with
+ * periods, like grades). Checking `resources[0].tabs` always failed, so
+ * messages, replies and recipients never loaded.
+ */
+function assertDiscussionsAvailable(session: SessionHandle) {
+  const authorizations = session.user?.authorizations;
+  if (authorizations && !authorizations.tabs.includes(TabLocation.Discussions) && !authorizations.canReadDiscussions) {
+    throw error("Discussions are not enabled for this account", "assertDiscussionsAvailable");
+  }
+}
+
 export async function fetchPronoteChats(
   session: SessionHandle,
   accountId: string
@@ -45,10 +58,7 @@ export async function fetchPronoteChatRecipients(
     throw error("Session is undefined", "fetchPronoteChatRecipients");
   }
 
-  const chatTab = session.user.resources[0].tabs.get(TabLocation.Discussions);
-  if (!chatTab) {
-    throw error("Chat tab not found in session", "fetchPronoteChatRecipients");
-  }
+  assertDiscussionsAvailable(session);
 
   if (!chat.ref) {
     throw error("Chat reference is undefined", "fetchPronoteChatRecipients");
@@ -79,10 +89,7 @@ export async function fetchPronoteChatMessages(
     throw error("Session is undefined", "fetchPronoteChatMessages");
   }
 
-  const chatTab = session.user.resources[0].tabs.get(TabLocation.Discussions);
-  if (!chatTab) {
-    throw error("Chat tab not found in session", "fetchPronoteChatMessages");
-  }
+  assertDiscussionsAvailable(session);
 
   if (!chat.ref) {
     throw error("Chat reference is undefined", "fetchPronoteChatMessages");
@@ -123,10 +130,7 @@ export async function sendPronoteMessageInChat(
     throw error("Session is undefined", "fetchPronoteChatMessages");
   }
 
-  const chatTab = session.user.resources[0].tabs.get(TabLocation.Discussions);
-  if (!chatTab) {
-    throw error("Chat tab not found in session", "fetchPronoteChatMessages");
-  }
+  assertDiscussionsAvailable(session);
 
   if (!chat.ref) {
     throw error("Chat reference is undefined", "fetchPronoteChatMessages");
@@ -146,21 +150,24 @@ export async function fetchPronoteRecipients(
     throw error("Session is undefined", "fetchPronoteChatMessages");
   }
 
-  const chatTab = session.user.resources[0].tabs.get(TabLocation.Discussions);
-  if (!chatTab) {
-    throw error("Chat tab not found in session", "fetchPronoteChatMessages");
+  assertDiscussionsAvailable(session);
+
+  // Teachers and school staff are fetched separately: the school may allow
+  // one and not the other, and one refusal must not empty the whole list.
+  const authorizations = session.user?.authorizations;
+  const kinds = [
+    ...(authorizations?.canDiscussWithTeachers === false ? [] : [EntityKind.Teacher]),
+    ...(authorizations?.canDiscussWithStaff === false ? [] : [EntityKind.Personal]),
+  ];
+  const settled = await Promise.allSettled(kinds.map(kind => newDiscussionRecipients(session, kind)));
+  const failures = settled.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+  if (failures.length === settled.length && failures.length > 0) {
+    throw failures[0].reason;
   }
-
-  const alLRecipients = await Promise.all(
-    session.user.resources.flatMap(() =>
-      [
-        EntityKind.Teacher,
-        EntityKind.Personal
-      ].map(kind => newDiscussionRecipients(session, kind))
-    )
-  );
-
-  const recipients = alLRecipients.flat();
+  const seen = new Set<string>();
+  const recipients = settled
+    .flatMap(result => (result.status === "fulfilled" ? result.value : []))
+    .filter(recipient => (seen.has(recipient.id) ? false : (seen.add(recipient.id), true)));
 
   return recipients.map((recipient) => {
     const [namePart, classPart] = recipient.name.split("(");

@@ -30,6 +30,7 @@ export default function NewChat() {
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     getManager(true)
@@ -38,8 +39,15 @@ export default function NewChat() {
         const unique = new Map<string, Recipient>();
         for (const recipient of list ?? []) {unique.set(recipient.id, recipient);}
         setRecipients([...unique.values()].sort((a, b) => a.name.localeCompare(b.name)));
+        if ((list ?? []).length === 0) {
+          const failure = getManager(true)?.getFailures(Capabilities.CHAT_READ)[0];
+          if (failure) {setLoadError(String(failure.reason instanceof Error ? failure.reason.message : failure.reason));}
+        }
       })
-      .catch(error => warn(`Recipients: ${String(error)}`))
+      .catch(error => {
+        warn(`Recipients: ${String(error)}`);
+        setLoadError(error instanceof Error ? error.message : String(error));
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -177,7 +185,9 @@ export default function NewChat() {
           {!loading && filtered.length === 0 && (
             <List.Item>
               <Typography color="textSecondary">
-                {recipients.length === 0 ? "Aucun destinataire disponible (hors connexion ?)." : "Aucun résultat."}
+                {recipients.length === 0
+                  ? loadError ? `Impossible de charger les destinataires : ${loadError}` : "Aucun destinataire disponible."
+                  : "Aucun résultat."}
               </Typography>
             </List.Item>
           )}

@@ -10,6 +10,7 @@ import {
   SuspendedIPError,
   TokenAuthenticationParams,
   UnreachableError,
+  use,
 } from "@blockshub/pawnote-lts";
 
 import { SecurityChallengeError } from "@/services/errors/SecurityChallengeError";
@@ -109,6 +110,11 @@ async function loginWithStoredToken(
 
     try {
       const refresh = await loginToken(handle, loginParams);
+      // Selects the student resource: some calls (new discussion recipients,
+      // timetable) read session.userResource and fail while it is unset.
+      if (handle.user?.resources?.length) {
+        use(handle, 0);
+      }
 
       const auth: Auth = {
         accessToken: refresh.token,

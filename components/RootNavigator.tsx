@@ -240,6 +240,37 @@ function RootNavigatorContent() {
         />
 
         <Stack.Screen
+          name="(features)/(chats)/chats"
+          options={{
+            headerShown: false,
+            headerTitle: "Discussions",
+            headerTransparent: runsIOS26,
+            headerLargeTitle: false,
+            presentation: "modal",
+          }}
+        />
+
+        <Stack.Screen
+          name="(features)/(chats)/thread"
+          options={{
+            headerShown: true,
+            headerTitle: "Discussion",
+            headerTransparent: runsIOS26,
+            headerLargeTitle: false,
+          }}
+        />
+
+        <Stack.Screen
+          name="(features)/(chats)/new"
+          options={{
+            headerShown: true,
+            headerTitle: "Nouvelle discussion",
+            headerTransparent: runsIOS26,
+            headerLargeTitle: false,
+          }}
+        />
+
+        <Stack.Screen
           name="(features)/menu"
           options={{
             headerShown: true,

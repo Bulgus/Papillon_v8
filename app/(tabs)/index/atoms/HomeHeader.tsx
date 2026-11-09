@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useChatsStore } from '@/stores/chats';
 import Stack from '@/ui/components/Stack';
 import { getCurrentPeriod } from '@/utils/grades/helper/period';
 
@@ -14,6 +15,13 @@ const HomeHeader = () => {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { availableCanteenCards, attendancesPeriods, attendances, absencesCount, news } = useHomeHeaderData();
+  const unreadChats = useChatsStore(state => state.chats.filter(chat => (chat.unread ?? 0) > 0).length);
+  const refreshChats = useChatsStore(state => state.refresh);
+  React.useEffect(() => {
+    // Fills the unread count once the account manager is there.
+    const timer = setTimeout(() => { refreshChats(); }, 4000);
+    return () => clearTimeout(timer);
+  }, [refreshChats]);
   const currentAttendancePeriod = attendancesPeriods.length > 0
     ? getCurrentPeriod(attendancesPeriods)
     : undefined;
@@ -59,8 +67,17 @@ const HomeHeader = () => {
       color: "#0080ff",
       description: news[0]?.title ?? t("News_Empty_Title"),
       route: "/(features)/(news)/news"
+    },
+    {
+      title: "Discussions",
+      icon: "TextBubble",
+      color: "#7A4DD6",
+      description: unreadChats > 0
+        ? `${unreadChats} non lue${unreadChats > 1 ? "s" : ""}`
+        : "Messagerie",
+      route: "/(features)/(chats)/chats"
     }
-  ], [availableCanteenCards, absencesCount, news, currentAttendancePeriod, attendancesPeriods, attendances, t]);
+  ], [availableCanteenCards, absencesCount, news, currentAttendancePeriod, attendancesPeriods, attendances, unreadChats, t]);
 
   return (
     <View style={{ paddingHorizontal: 0, width: "100%", flex: 1, overflow: "visible" }}>

@@ -10,6 +10,11 @@ export interface Chat extends GenericInterface {
   recipient?: string;
   creator?: string;
   date: Date;
+  /** Unread messages, when the service says. */
+  unread?: number;
+  messageCount?: number;
+  /** No reply possible (closed by the school). */
+  closed?: boolean;
   ref?: Discussion | Mail;
 }
 
@@ -26,5 +31,7 @@ export interface Message {
   author: string;
   subject: string;
   date: Date;
-  attachments: Attachment[]
+  attachments: Attachment[];
+  /** Sent by the user. */
+  isMine?: boolean;
 }

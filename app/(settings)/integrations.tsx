@@ -102,6 +102,7 @@ function useNotificationsSections(): React.ReactNode[] {
 
         {toggleRow({ icon: "Grades", title: "Nouvelles notes", description: "Note, matière et moyenne de classe dès qu'elles arrivent.", value: preferences.newGrades, onValueChange: value => setPreferences({ newGrades: value }) })}
         {toggleRow({ icon: "Tasks", title: "Nouveaux devoirs", description: "Quand un prof ajoute un devoir ou une évaluation sur les deux prochaines semaines.", value: preferences.newHomework, onValueChange: value => setPreferences({ newHomework: value }) })}
+        {toggleRow({ icon: "TextBubble", title: "Nouveaux messages", description: "Quand un prof ou la vie scolaire t'écrit dans les discussions.", value: preferences.newMessages, onValueChange: value => setPreferences({ newMessages: value }) })}
         {toggleRow({ icon: "PiggyBank", title: "Solde de cantine bas", description: "Prévient une fois par baisse quand il te reste peu de repas.", value: preferences.lowBalance, onValueChange: value => setPreferences({ lowBalance: value }) })}
         {preferences.lowBalance && (
           <List.Item>
@@ -377,7 +378,7 @@ function useVikunjaConnectedSections(): React.ReactNode[] {
         </List.Item>
         {toggleRow({ icon: "Tasks", title: "Tâches Vikunja dans l'onglet Tâches", description: "Tes tâches s'affichent avec tes devoirs, au bon jour (et « En retard », « Sans échéance »).", value: state.showInApp, onValueChange: value => state.update({ showInApp: value }) })}
         {toggleRow({ icon: "ArrowRightUp", title: "Envoyer les devoirs automatiquement", description: "Chaque nouveau devoir Pronote devient une tâche dans le projet de sa matière.", value: state.autoSync, onValueChange: value => state.update({ autoSync: value }) })}
-        {toggleRow({ icon: "Check", title: "Synchroniser « fait »", description: "Cocher un devoir dans Papillon le coche aussi dans Vikunja.", value: state.syncCompletion, onValueChange: value => state.update({ syncCompletion: value }) })}
+        {toggleRow({ icon: "Check", title: "Synchroniser « fait »", description: "Dans les deux sens : cocher dans Papillon coche dans Vikunja, et cocher dans Vikunja (mDone…) coche dans Papillon et sur Pronote. Vikunja fait foi en cas de conflit.", value: state.syncCompletion, onValueChange: value => state.update({ syncCompletion: value }) })}
         <List.Item onPress={() => router.push("/(features)/vikunja")}>
           <List.Leading>
             <Icon>

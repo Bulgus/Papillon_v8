@@ -4,9 +4,10 @@ import { getVikunjaToken, useVikunjaStore } from "@/stores/vikunja";
 import { warn } from "@/utils/logger/logger";
 import { getSubjectName } from "@/utils/subjects/name";
 import { cleanSubjectName } from "@/utils/subjects/utils";
+import { reconcileCompletion } from "@/utils/vikunja/reconcile";
 import { findSchoolRootProject, matchProjectForSubject, normalizeSubject } from "@/utils/vikunja/match";
 
-import { VikunjaClient, VikunjaProject } from "./api";
+import { VikunjaClient, VikunjaError, VikunjaProject } from "./api";
 
 let projectsCache: { at: number; baseURL: string; projects: VikunjaProject[] } | null = null;
 const PROJECTS_TTL = 5 * 60 * 1000;
@@ -132,6 +133,12 @@ export function isHomeworkExported(homework: Homework): boolean {
   return Boolean(useVikunjaStore.getState().exported[getHomeworkRouteId(homework)]);
 }
 
+/** Vikunja task id of a homework, when it is in Vikunja (not deleted there). */
+export function exportedTaskId(homework: Homework): number | null {
+  const id = useVikunjaStore.getState().exported[getHomeworkRouteId(homework)];
+  return id && id > 0 ? id : null;
+}
+
 /** Creates the Vikunja task for a homework (once). Returns the task id. */
 export async function exportHomeworkToVikunja(homework: Homework): Promise<number> {
   const client = await getVikunjaClient();
@@ -139,7 +146,8 @@ export async function exportHomeworkToVikunja(homework: Homework): Promise<numbe
 
   const key = getHomeworkRouteId(homework);
   const existing = useVikunjaStore.getState().exported[key];
-  if (existing) {return existing;}
+  // -1: deleted in Vikunja, a manual export creates it again.
+  if (existing && existing > 0) {return existing;}
 
   const projects = await getVikunjaProjects();
   const project = resolveProjectForSubject(homework.subject, projects);
@@ -159,18 +167,20 @@ export async function exportHomeworkToVikunja(homework: Homework): Promise<numbe
   if (homework.isDone) {
     await client.setDone(task.id, true).catch(() => undefined);
   }
+  useVikunjaStore.getState().markSynced(key, homework.isDone);
   return task.id;
 }
 
 /** Mirrors a "done" toggle made in Papillon to the exported Vikunja task. */
 export async function mirrorHomeworkCompletion(homework: Homework, done: boolean): Promise<void> {
-  const { exported, syncCompletion } = useVikunjaStore.getState();
-  const taskId = exported[getHomeworkRouteId(homework)];
+  const { syncCompletion } = useVikunjaStore.getState();
+  const taskId = exportedTaskId(homework);
   if (!taskId || !syncCompletion) {return;}
   const client = await getVikunjaClient();
   if (!client) {return;}
   try {
     await client.setDone(taskId, done);
+    useVikunjaStore.getState().markSynced(getHomeworkRouteId(homework), done);
   } catch (error) {
     warn(`Vikunja completion sync failed: ${String(error)}`);
   }
@@ -209,4 +219,81 @@ export async function syncHomeworksToVikunja(homeworks: Homework[]): Promise<num
     syncing = false;
   }
   return created;
+}
+
+export interface CompletionChange {
+  key: string;
+  homework: Homework;
+  done: boolean;
+}
+
+/** Applies a "done" state decided by Vikunja to Papillon and the school service. */
+async function applyCompletionToPapillon(homework: Homework, done: boolean): Promise<void> {
+  // Lazy: services/shared pulls every school service in.
+  const { getManager } = await import("@/services/shared");
+  const { updateHomeworkIsDone } = await import("@/database/useHomework");
+  if (!homework.custom) {
+    await getManager()?.setHomeworkCompletion(homework, done);
+  }
+  await updateHomeworkIsDone(getHomeworkRouteId(homework), done);
+}
+
+let pulling = false;
+
+/**
+ * Two-way completion sync for exported homework, Vikunja being the source of
+ * truth: a task checked in Vikunja (mDone…) is checked in Papillon and on the
+ * school service; a homework checked in Papillon while Vikunja was out of
+ * reach is pushed there. Returns what changed in Papillon.
+ */
+export async function syncCompletionWithVikunja(
+  homeworks: Homework[],
+  apply: (homework: Homework, done: boolean) => Promise<void> = applyCompletionToPapillon
+): Promise<CompletionChange[]> {
+  const { syncCompletion, connected } = useVikunjaStore.getState();
+  if (!syncCompletion || !connected || pulling) {return [];}
+  const client = await getVikunjaClient();
+  if (!client) {return [];}
+
+  pulling = true;
+  const changes: CompletionChange[] = [];
+  try {
+    const seen = new Set<string>();
+    for (const homework of homeworks) {
+      const key = getHomeworkRouteId(homework);
+      if (seen.has(key)) {continue;}
+      seen.add(key);
+      const taskId = exportedTaskId(homework);
+      if (!taskId) {continue;}
+
+      let vikunjaDone: boolean;
+      try {
+        vikunjaDone = Boolean((await client.getTask(taskId)).done);
+      } catch (error) {
+        if (error instanceof VikunjaError && error.status === 404) {
+          // Deleted in Vikunja: keep it out of Vikunja from now on.
+          useVikunjaStore.getState().markExported(key, -1);
+          continue;
+        }
+        warn(`Vikunja completion pull failed: ${String(error)}`);
+        break;
+      }
+
+      const action = reconcileCompletion(Boolean(homework.isDone), vikunjaDone, useVikunjaStore.getState().syncedDone[key]);
+      try {
+        if (action === "toPapillon") {
+          await apply(homework, vikunjaDone);
+          changes.push({ key, homework, done: vikunjaDone });
+        } else if (action === "toVikunja") {
+          await client.setDone(taskId, Boolean(homework.isDone));
+        }
+        useVikunjaStore.getState().markSynced(key, action === "toPapillon" ? vikunjaDone : Boolean(homework.isDone));
+      } catch (error) {
+        warn(`Vikunja completion sync failed: ${String(error)}`);
+      }
+    }
+  } finally {
+    pulling = false;
+  }
+  return changes;
 }

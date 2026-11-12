@@ -39,6 +39,28 @@ export default function Layout() {
         }}
       />
       <Stack.Screen
+        name="evaluations"
+        options={{
+          headerShown: true,
+          headerTitle: 'Compétences',
+          headerLargeTitle: false,
+          headerTransparent: runsIOS26,
+          presentation: 'card',
+          ...androidHeaderProps,
+        }}
+      />
+      <Stack.Screen
+        name="gradebook"
+        options={{
+          headerShown: true,
+          headerTitle: 'Bulletin',
+          headerLargeTitle: false,
+          headerTransparent: runsIOS26,
+          presentation: 'card',
+          ...androidHeaderProps,
+        }}
+      />
+      <Stack.Screen
         name="simulator/index"
         options={{
           headerShown: true,

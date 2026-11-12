@@ -19,6 +19,8 @@ jest.mock("@/utils/logger/logger", () => ({
   error: jest.fn((message: string) => {
     throw new Error(message);
   }),
+  debug: jest.fn(),
+  info: jest.fn(),
   log: jest.fn(),
   warn: jest.fn(),
 }));

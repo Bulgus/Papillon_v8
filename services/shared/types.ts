@@ -19,6 +19,7 @@ import {
   QRCode,
 } from "@/services/shared/canteen";
 import { Chat, Message, Recipient } from "@/services/shared/chat";
+import { Gradebook, SkillEvaluation } from "@/services/shared/evaluation";
 import { Period, PeriodGrades } from "@/services/shared/grade";
 import { Homework } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
@@ -78,6 +79,12 @@ export interface SchoolServicePlugin {
   getNews?: () => Promise<News[]>;
   getGradesForPeriod?: (period: Period, kid?: Kid) => Promise<PeriodGrades>;
   getGradesPeriods?: () => Promise<Period[]>;
+  getEvaluationPeriods?: () => Promise<Period[]>;
+  getEvaluations?: (period: Period) => Promise<SkillEvaluation[]>;
+  getGradebookPeriods?: () => Promise<Period[]>;
+  getGradebook?: (period: Period) => Promise<Gradebook>;
+  /** URL of the official PDF of the bulletin. */
+  getGradebookPDF?: (period: Period) => Promise<string>;
   getAttendanceForPeriod?: (period: string) => Promise<Attendance>;
   getAttendancePeriods?: () => Promise<Period[]>;
   getWeeklyCanteenMenu?: (startDate: Date) => Promise<CanteenMenu[]>;
@@ -129,6 +136,10 @@ export enum Capabilities {
   CANTEEN_HISTORY,
   CANTEEN_BOOKINGS,
   CANTEEN_QRCODE,
+  /** Skill-based evaluations (Pronote "compétences"). */
+  EVALUATIONS,
+  /** Period report ("bulletin"). */
+  GRADEBOOK,
 }
 
 /**

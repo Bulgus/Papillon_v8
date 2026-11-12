@@ -6,6 +6,8 @@ import { createMMKVStorage } from "../global";
 export interface NotificationPreferences {
   newGrades: boolean;
   newHomework: boolean;
+  /** New messages in the school messaging (Pronote discussions). */
+  newMessages: boolean;
   lowBalance: boolean;
   /** Alert when fewer meals than this remain (or the € amount below when the meal price is unknown). */
   lowBalanceMeals: number;
@@ -25,6 +27,8 @@ export interface NotificationsState {
   /** Grade keys built from stable fields (see gradeKey). */
   seenGradeKeys: Record<string, string[]>;
   seenHomework: Record<string, string[]>;
+  /** Discussion states already notified (see chatNotificationKey). */
+  seenChats: Record<string, string[]>;
   /** Per wallet: amount at which we last warned. */
   balanceAlerts: Record<string, { amount: number; at: number }>;
   lastCheckAt?: number;
@@ -32,7 +36,7 @@ export interface NotificationsState {
   calendarId?: string;
 
   setPreferences: (changes: Partial<NotificationPreferences>) => void;
-  setSeen: (kind: "seenGradeKeys" | "seenHomework", accountId: string, keys: string[]) => void;
+  setSeen: (kind: "seenGradeKeys" | "seenHomework" | "seenChats", accountId: string, keys: string[]) => void;
   setBalanceAlert: (walletKey: string, amount: number | null) => void;
   setLastCheck: (result: string) => void;
   setCalendarId: (id: string | undefined) => void;
@@ -43,6 +47,7 @@ const MAX_SEEN = 1500;
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   newGrades: true,
   newHomework: true,
+  newMessages: true,
   lowBalance: true,
   lowBalanceMeals: 3,
   lowBalanceAmount: 10,
@@ -58,6 +63,7 @@ export const useNotificationsStore = create<NotificationsState>()(
       seenGrades: {},
       seenGradeKeys: {},
       seenHomework: {},
+      seenChats: {},
       balanceAlerts: {},
       setPreferences: changes =>
         set(state => ({ preferences: { ...state.preferences, ...changes } })),

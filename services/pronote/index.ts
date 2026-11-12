@@ -12,6 +12,13 @@ import {
   fetchPronoteRecipients, sendPronoteMessageInChat,
 } from "@/services/pronote/chat";
 import { classifyPronoteError } from "@/services/pronote/errors";
+import {
+  fetchPronoteEvaluationPeriods,
+  fetchPronoteEvaluations,
+  fetchPronoteGradebook,
+  fetchPronoteGradebookPDF,
+  fetchPronoteGradebookPeriods,
+} from "@/services/pronote/evaluations";
 import { fetchPronoteGradePeriods, fetchPronoteGrades } from "@/services/pronote/grades";
 import { fetchPronoteHomeworks, setPronoteHomeworkAsDone } from "@/services/pronote/homework";
 import { fetchPronoteNews, setPronoteNewsAsAcknowledged } from "@/services/pronote/news";
@@ -20,6 +27,7 @@ import { fetchPronoteCourseResources, fetchPronoteWeekTimetable } from "@/servic
 import { Attendance } from "@/services/shared/attendance";
 import { CanteenMenu } from "@/services/shared/canteen";
 import { Chat, Message, Recipient } from "@/services/shared/chat";
+import { Gradebook, SkillEvaluation } from "@/services/shared/evaluation";
 import { Period, PeriodGrades } from "@/services/shared/grade";
 import { Homework } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
@@ -65,12 +73,21 @@ export class Pronote implements SchoolServicePlugin {
       [TabLocation.News]: Capabilities.NEWS,
       [TabLocation.Menus]: Capabilities.CANTEEN_MENU,
       [TabLocation.Timetable]: Capabilities.TIMETABLE,
+      [TabLocation.Evaluations]: Capabilities.EVALUATIONS,
+      [TabLocation.Gradebook]: Capabilities.GRADEBOOK,
     };
 
-    for (const tab of this.session.user?.authorizations?.tabs ?? []) {
+    // Tabs with periods (evaluations, bulletin) are listed on the resource.
+    const tabs = new Set<TabLocation>([
+      ...(this.session.user?.authorizations?.tabs ?? []),
+      ...(this.session.user?.resources?.[0]?.tabs?.keys() ?? []),
+    ]);
+    for (const tab of tabs) {
       const capability = tabCapabilities[tab];
       if (capability) {
-        this.capabilities.push(...(Array.isArray(capability) ? capability : [capability]));
+        for (const item of Array.isArray(capability) ? capability : [capability]) {
+          if (!this.capabilities.includes(item)) {this.capabilities.push(item);}
+        }
       }
     }
 		
@@ -125,6 +142,26 @@ export class Pronote implements SchoolServicePlugin {
 
   getGradesPeriods(): Promise<Period[]> {
     return this.withSession(session => fetchPronoteGradePeriods(session, this.accountId));
+  }
+
+  getEvaluationPeriods(): Promise<Period[]> {
+    return this.withSession(session => fetchPronoteEvaluationPeriods(session, this.accountId));
+  }
+
+  getEvaluations(period: Period): Promise<SkillEvaluation[]> {
+    return this.withSession(session => fetchPronoteEvaluations(session, this.accountId, period));
+  }
+
+  getGradebookPeriods(): Promise<Period[]> {
+    return this.withSession(session => fetchPronoteGradebookPeriods(session, this.accountId));
+  }
+
+  getGradebook(period: Period): Promise<Gradebook> {
+    return this.withSession(session => fetchPronoteGradebook(session, this.accountId, period));
+  }
+
+  getGradebookPDF(period: Period): Promise<string> {
+    return this.withSession(session => fetchPronoteGradebookPDF(session, period));
   }
 
   getAttendanceForPeriod(period: string): Promise<Attendance> {

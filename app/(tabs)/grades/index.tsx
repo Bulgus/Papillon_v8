@@ -23,7 +23,7 @@ import GradesLoading from './atoms/GradesLoading';
 import List from '@/ui/new/List';
 import useResizable from '@/ui/utils/Resizable';
 import CompactGrade from '@/ui/new/CompactGrade';
-import { AndroidHeaderButton, AndroidHeaderMenu } from '@/components/AndroidHeaderItems';
+import { AndroidHeaderMenu } from '@/components/AndroidHeaderItems';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SafeHorizontalView, { SAFE_HORIZONTAL_EDGES } from '@/ui/components/SafeHorizontalView';
 
@@ -198,7 +198,19 @@ const GradesView = () => {
       {isAndroid ? (
         <Stack.Toolbar placement="right" asChild>
           <View style={{ flexDirection: 'row' }}>
-            <AndroidHeaderButton icon="Coefficient" accessibilityLabel="Simulateur" onPress={openSimulator} />
+            <AndroidHeaderMenu
+              icon="Coefficient"
+              accessibilityLabel="Outils"
+              actions={[
+                { id: 'simulator', title: 'Simulateur', papicon: 'Coefficient' },
+                { id: 'evaluations', title: 'Compétences', papicon: 'Check' },
+                { id: 'gradebook', title: 'Bulletin', papicon: 'Paper' },
+              ]}
+              onPressAction={({ nativeEvent }) => {
+                if (nativeEvent.event === 'simulator') {openSimulator();}
+                else {router.push(`/(tabs)/grades/${nativeEvent.event}` as never);}
+              }}
+            />
             <AndroidHeaderMenu
               icon="Filter"
               accessibilityLabel="Sort by"
@@ -214,7 +226,19 @@ const GradesView = () => {
         </Stack.Toolbar>
       ) : (
         <Stack.Toolbar placement="right">
-          <Stack.Toolbar.Button icon="plus.forwardslash.minus" accessibilityLabel="Simulateur" onPress={openSimulator} />
+          <Stack.Toolbar.Menu>
+            <Stack.Toolbar.Icon sf="ellipsis.circle" />
+            <Stack.Toolbar.Label>Outils</Stack.Toolbar.Label>
+            <Stack.Toolbar.MenuAction icon="plus.forwardslash.minus" onPress={openSimulator}>
+              Simulateur
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction icon="target" onPress={() => router.push('/(tabs)/grades/evaluations')}>
+              Compétences
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction icon="doc.text" onPress={() => router.push('/(tabs)/grades/gradebook')}>
+              Bulletin
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
           <Stack.Toolbar.Menu>
             <Stack.Toolbar.Icon sf="line.3.horizontal.decrease" />
             <Stack.Toolbar.Label>Sort by</Stack.Toolbar.Label>

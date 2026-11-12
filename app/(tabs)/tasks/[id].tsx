@@ -20,7 +20,7 @@ import { getSubjectColor } from "@/utils/subjects/colors";
 import { getSubjectEmoji } from "@/utils/subjects/emoji";
 import { getSubjectName } from "@/utils/subjects/name";
 import { Alert, Platform } from "react-native";
-import { exportHomeworkToVikunja, isHomeworkExported, mirrorHomeworkCompletion } from "@/services/vikunja";
+import { exportedTaskId, exportHomeworkToVikunja, mirrorHomeworkCompletion } from "@/services/vikunja";
 import { useVikunjaStore } from "@/stores/vikunja";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import List from "@/ui/new/List";
@@ -104,7 +104,7 @@ const Task = () => {
   const vikunjaConnected = useVikunjaStore(state => state.connected);
   const exportedMap = useVikunjaStore(state => state.exported);
   const [exporting, setExporting] = useState(false);
-  const exportedToVikunja = task ? Boolean(exportedMap) && isHomeworkExported(task) : false;
+  const exportedToVikunja = task ? Boolean(exportedMap) && exportedTaskId(task) !== null : false;
 
   const sendToVikunja = async () => {
     if (!task || exporting) return;

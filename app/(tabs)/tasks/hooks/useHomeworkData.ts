@@ -13,7 +13,7 @@ import { error } from '@/utils/logger/logger';
 import { trackAdvancedEvent } from '@/utils/logger/analytics';
 import { notificationAsync, NotificationFeedbackType } from "expo-haptics";
 import { useFocusEffect } from "expo-router";
-import { mirrorHomeworkCompletion, syncHomeworksToVikunja } from "@/services/vikunja";
+import { mirrorHomeworkCompletion, syncCompletionWithVikunja, syncHomeworksToVikunja } from "@/services/vikunja";
 
 // Cache reads are coalesced over this window: fetching five weeks would
 // otherwise re-query every one of them five times over.
@@ -150,7 +150,23 @@ export const useHomeworkData = (weeks: number[], alert: any) => {
         }
         fetchedWeeks.current.add(week);
         setHomework(prev => ({ ...prev, ...fetched }));
-        syncHomeworksToVikunja(result.filter(hw => !hw.fromCache)).catch(() => undefined);
+        const fresh = result.filter(hw => !hw.fromCache);
+        // Vikunja first: a task checked there is checked here before the
+        // export step looks at what is still to do.
+        syncCompletionWithVikunja(fresh)
+          .then(changes => {
+            if (changes.length) {
+              setHomework(prev => {
+                const next = { ...prev };
+                for (const change of changes) {
+                  if (next[change.key]) {next[change.key] = { ...next[change.key], isDone: change.done };}
+                }
+                return next;
+              });
+            }
+          })
+          .catch(() => undefined)
+          .finally(() => syncHomeworksToVikunja(fresh).catch(() => undefined));
         scheduleRefresh();
         // The manager falls back to the cache rather than throwing, so a service
         // that failed is only visible through its recorded failures.

@@ -1,0 +1,62 @@
+name: Retard sur Papillon officiel
+
+# Each week, says how far this fork is behind PapillonApp/Papillon (dev) and
+# whether the merge would be clean. The merge itself is done in a work
+# session (see CLAUDE.md), where conflicts can be resolved and tests run.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    if: github.repository != 'PapillonApp/Papillon'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Compare with upstream
+        id: compare
+        run: |
+          git remote add upstream https://github.com/PapillonApp/Papillon.git
+          git fetch --quiet upstream dev
+          behind=$(git rev-list --count HEAD..upstream/dev)
+          echo "behind=$behind" >> "$GITHUB_OUTPUT"
+          git -c user.name=ci -c user.email=ci@localhost merge --no-commit --no-ff upstream/dev >/dev/null 2>&1 \
+            && conflicts="" || conflicts=$(git diff --name-only --diff-filter=U | tr '\n' ' ')
+          git merge --abort 2>/dev/null || true
+          echo "conflicts=$conflicts" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Papillon officiel (dev)"
+            echo "- Commits en retard : $behind"
+            echo "- Conflits prévus : ${conflicts:-aucun}"
+            echo
+            git log --oneline HEAD..upstream/dev | head -30 | sed 's/^/    /'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Open or update the reminder issue
+        if: steps.compare.outputs.behind != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEHIND: ${{ steps.compare.outputs.behind }}
+          CONFLICTS: ${{ steps.compare.outputs.conflicts }}
+        run: |
+          title="Synchro avec Papillon officiel"
+          body="Le fork a **$BEHIND commits** de retard sur PapillonApp/Papillon (dev).
+          Conflits prévus : ${CONFLICTS:-aucun}.
+
+          À fusionner lors de la prochaine session de travail (voir CLAUDE.md).
+          Détail : $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          existing=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

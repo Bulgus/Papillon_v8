@@ -33,6 +33,7 @@ import {
   getHomeworksFromCache,
 } from "@/database/useHomework";
 import { addKidToDatabase, getKidsFromCache } from "@/database/useKids";
+import { cacheReport, getCachedReport, reportCacheKey } from "@/database/useReports";
 import { addNewsToDatabase, getNewsFromCache } from "@/database/useNews";
 import {
   addCourseDayToDatabase,
@@ -48,6 +49,7 @@ import {
   QRCode,
 } from "@/services/shared/canteen";
 import { Chat, Message, Recipient } from "@/services/shared/chat";
+import { Gradebook, SkillEvaluation } from "@/services/shared/evaluation";
 import { Period, PeriodGrades } from "@/services/shared/grade";
 import { Homework } from "@/services/shared/homework";
 import { News } from "@/services/shared/news";
@@ -288,6 +290,72 @@ export class AccountManager {
         },
       }
     );
+  }
+
+  async getEvaluationPeriods(): Promise<Period[]> {
+    return await this.fetchData(
+      Capabilities.EVALUATIONS,
+      async client => (client.getEvaluationPeriods ? await client.getEvaluationPeriods() : []),
+      {
+        multiple: true,
+        fallback: async () => getCachedReport<Period[]>(reportCacheKey("evaluation-periods", "all")) ?? [],
+        saveToCache: async (data: Period[]) => cacheReport(reportCacheKey("evaluation-periods", "all"), data),
+      }
+    );
+  }
+
+  async getEvaluations(period: Period, clientId: string): Promise<SkillEvaluation[]> {
+    const key = reportCacheKey("evaluations", clientId, period);
+    return await this.fetchData(
+      Capabilities.EVALUATIONS,
+      async client => (client.getEvaluations ? await client.getEvaluations(period) : []),
+      {
+        multiple: true,
+        clientId,
+        fallback: async () => getCachedReport<SkillEvaluation[]>(key) ?? [],
+        saveToCache: async (data: SkillEvaluation[]) => cacheReport(key, data),
+      }
+    );
+  }
+
+  async getGradebookPeriods(): Promise<Period[]> {
+    return await this.fetchData(
+      Capabilities.GRADEBOOK,
+      async client => (client.getGradebookPeriods ? await client.getGradebookPeriods() : []),
+      {
+        multiple: true,
+        fallback: async () => getCachedReport<Period[]>(reportCacheKey("gradebook-periods", "all")) ?? [],
+        saveToCache: async (data: Period[]) => cacheReport(reportCacheKey("gradebook-periods", "all"), data),
+      }
+    );
+  }
+
+  async getGradebook(period: Period, clientId: string): Promise<Gradebook> {
+    const key = reportCacheKey("gradebook", clientId, period);
+    return await this.fetchData(
+      Capabilities.GRADEBOOK,
+      async client =>
+        client.getGradebook ? await client.getGradebook(period) : Promise.reject(error("Bad Implementation")),
+      {
+        multiple: false,
+        clientId,
+        fallback: async () => {
+          const cached = getCachedReport<Gradebook>(key);
+          if (!cached) {throw new Error("Bulletin indisponible hors connexion.");}
+          return cached;
+        },
+        saveToCache: async (data: Gradebook) => cacheReport(key, data),
+      }
+    );
+  }
+
+  /** URL of the official PDF: needs the service, no cache. */
+  async getGradebookPDF(period: Period, clientId: string): Promise<string> {
+    const client = this.getAvailableClients(Capabilities.GRADEBOOK).find(
+      item => (item as { accountId?: string }).accountId === clientId
+    ) ?? this.getAvailableClients(Capabilities.GRADEBOOK)[0];
+    if (!client?.getGradebookPDF) {throw new Error("PDF du bulletin indisponible.");}
+    return client.getGradebookPDF(period);
   }
 
   async getAttendanceForPeriod(period: string): Promise<Attendance[]> {

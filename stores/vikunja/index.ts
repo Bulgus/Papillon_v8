@@ -51,15 +51,18 @@ export interface VikunjaState {
   newTasksToVikunja: boolean;
   /** Tasks tab filter: everything, school homework only, or Vikunja only. */
   tasksSource: "all" | "school" | "vikunja";
-  /** homework key → Vikunja task id. */
+  /** homework key → Vikunja task id (-1: task deleted in Vikunja, never re-exported). */
   exported: Record<string, number>;
+  /** homework key → "done" state both sides last agreed on. */
+  syncedDone: Record<string, boolean>;
   lastSyncAt?: number;
 
   connect: (data: { baseURL: string; token: string; tokenId?: number; displayName?: string }) => Promise<void>;
   disconnect: () => Promise<void>;
-  update: (changes: Partial<Omit<VikunjaState, "connect" | "disconnect" | "update" | "markExported" | "forgetExported">>) => void;
+  update: (changes: Partial<Omit<VikunjaState, "connect" | "disconnect" | "update" | "markExported" | "forgetExported" | "markSynced">>) => void;
   markExported: (homeworkKey: string, taskId: number) => void;
   forgetExported: (homeworkKey: string) => void;
+  markSynced: (homeworkKey: string, done: boolean) => void;
 }
 
 const initial = {
@@ -75,6 +78,7 @@ const initial = {
   newTasksToVikunja: true,
   tasksSource: "all" as const,
   exported: {},
+  syncedDone: {},
   lastSyncAt: undefined,
 };
 
@@ -99,11 +103,14 @@ export const useVikunjaStore = create<VikunjaState>()(
           delete exported[homeworkKey];
           return { exported };
         }),
+      markSynced: (homeworkKey, done) =>
+        set(state => ({ syncedDone: { ...state.syncedDone, [homeworkKey]: done } })),
     }),
     {
       name: "vikunja-storage",
       storage: createMMKVStorage<VikunjaState>("vikunja"),
-      version: 1,
+      version: 2,
+      migrate: persisted => ({ syncedDone: {}, ...(persisted as object) }) as VikunjaState,
     }
   )
 );

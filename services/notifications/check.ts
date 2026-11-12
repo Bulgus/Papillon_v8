@@ -8,12 +8,15 @@ import { Balance } from "@/services/shared/balance";
 import { Grade } from "@/services/shared/grade";
 import { Homework } from "@/services/shared/homework";
 import { CourseStatus } from "@/services/shared/timetable";
+import { Capabilities } from "@/services/shared/types";
 import { syncTimetableToCalendar } from "@/services/calendarSync";
-import { syncHomeworksToVikunja } from "@/services/vikunja";
+import { syncCompletionWithVikunja, syncHomeworksToVikunja } from "@/services/vikunja";
 import { useAccountStore } from "@/stores/account";
 import { useNotificationsStore } from "@/stores/notifications";
 import { getCurrentPeriod } from "@/utils/grades/helper/period";
 import { log, warn } from "@/utils/logger/logger";
+import { gradeKey } from "@/utils/notifications/grades";
+import { chatNotificationKey, freshUnreadChats, messageNotification } from "@/utils/notifications/messages";
 import { getSubjectName } from "@/utils/subjects/name";
 
 export const DIGEST_NOTIFICATION_ID = "papillon-daily-digest";
@@ -29,19 +32,7 @@ const formatScore = (grade: Grade): string => {
   return `${value}/${outOf}`;
 };
 
-/**
- * Identity of a grade across sessions. Not its id: Pronote hands out new ids
- * at every login, which made every grade look new on each check.
- */
-export const gradeKey = (grade: Grade) =>
-  [
-    grade.subjectName,
-    grade.description,
-    grade.givenAt ? new Date(grade.givenAt).toDateString() : "",
-    grade.studentScore?.disabled ? grade.studentScore?.status ?? "" : grade.studentScore?.value ?? "",
-    grade.outOf?.value ?? "",
-    grade.coefficient ?? "",
-  ].join("|");
+export { gradeKey };
 
 async function notify(title: string, body: string, data: Record<string, unknown> = {}) {
   await Notifications.scheduleNotificationAsync({
@@ -148,6 +139,26 @@ async function checkHomework(manager: AccountManager, accountId: string, silent:
 
   store.setSeen("seenHomework", accountId, [...seen, ...homeworks.map(getHomeworkRouteId)]);
   return { count: firstRun ? 0 : fresh.length, homeworks };
+}
+
+async function checkMessages(manager: AccountManager, accountId: string, silent: boolean): Promise<number> {
+  if (manager.getAvailableClients(Capabilities.CHAT_READ).length === 0) {return 0;}
+  const chats = await manager.getChats();
+  // The manager falls back to the cache on failure: old states, nothing new.
+  if (manager.getFailures(Capabilities.CHAT_READ).length > 0) {return 0;}
+
+  const store = useNotificationsStore.getState();
+  const previous = store.seenChats[accountId];
+  const fresh = freshUnreadChats(chats, previous ?? []);
+  const firstRun = previous === undefined;
+
+  const notification = messageNotification(fresh);
+  if (!silent && !firstRun && store.preferences.newMessages && notification) {
+    await notify(notification.title, notification.body, { url: "/(features)/(chats)/chats" });
+  }
+
+  store.setSeen("seenChats", accountId, [...(previous ?? []), ...chats.map(chatNotificationKey)]);
+  return firstRun ? 0 : fresh.length;
 }
 
 async function checkBalances(manager: AccountManager): Promise<number> {
@@ -292,8 +303,12 @@ export function runNotificationCheck(options: { silent?: boolean; refresh?: bool
       homeworks = result.homeworks;
       return result.count;
     });
+    await step("messages", () => checkMessages(manager, accountId, silent));
     await step("balance", () => checkBalances(manager));
-    await step("vikunja", () => syncHomeworksToVikunja(homeworks));
+    await step("vikunja", async () => {
+      const changed = await syncCompletionWithVikunja(homeworks);
+      return (await syncHomeworksToVikunja(homeworks)) + changed.length;
+    });
     await step("calendar", () => syncTimetableToCalendar(manager));
     await step("liveActivity", async () => {
       // Ends finished course activities and hands the current one to iOS.

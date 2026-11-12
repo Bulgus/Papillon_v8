@@ -29,9 +29,19 @@ const formatScore = (grade: Grade): string => {
   return `${value}/${outOf}`;
 };
 
+/**
+ * Identity of a grade across sessions. Not its id: Pronote hands out new ids
+ * at every login, which made every grade look new on each check.
+ */
 export const gradeKey = (grade: Grade) =>
-  grade.id ||
-  [grade.subjectName, grade.description, grade.givenAt ? new Date(grade.givenAt).toDateString() : "", grade.studentScore?.value].join("|");
+  [
+    grade.subjectName,
+    grade.description,
+    grade.givenAt ? new Date(grade.givenAt).toDateString() : "",
+    grade.studentScore?.disabled ? grade.studentScore?.status ?? "" : grade.studentScore?.value ?? "",
+    grade.outOf?.value ?? "",
+    grade.coefficient ?? "",
+  ].join("|");
 
 async function notify(title: string, body: string, data: Record<string, unknown> = {}) {
   await Notifications.scheduleNotificationAsync({
@@ -74,7 +84,7 @@ async function checkGrades(manager: AccountManager, accountId: string, silent: b
   if (grades.length === 0) {return 0;}
 
   const store = useNotificationsStore.getState();
-  const previous = store.seenGrades[accountId];
+  const previous = store.seenGradeKeys[accountId];
   const seen = new Set(previous ?? []);
   const fresh = grades.filter(grade => !seen.has(gradeKey(grade)));
 
@@ -100,7 +110,7 @@ async function checkGrades(manager: AccountManager, accountId: string, silent: b
     }
   }
 
-  store.setSeen("seenGrades", accountId, [...seen, ...fresh.map(gradeKey)]);
+  store.setSeen("seenGradeKeys", accountId, [...seen, ...fresh.map(gradeKey)]);
   return firstRun ? 0 : fresh.length;
 }
 

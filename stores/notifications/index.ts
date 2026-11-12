@@ -20,7 +20,10 @@ export interface NotificationPreferences {
 export interface NotificationsState {
   preferences: NotificationPreferences;
   /** Per account: keys of grades/homework already seen (bounded). */
+  /** @deprecated id-based keys, unstable across Pronote sessions. */
   seenGrades: Record<string, string[]>;
+  /** Grade keys built from stable fields (see gradeKey). */
+  seenGradeKeys: Record<string, string[]>;
   seenHomework: Record<string, string[]>;
   /** Per wallet: amount at which we last warned. */
   balanceAlerts: Record<string, { amount: number; at: number }>;
@@ -29,7 +32,7 @@ export interface NotificationsState {
   calendarId?: string;
 
   setPreferences: (changes: Partial<NotificationPreferences>) => void;
-  setSeen: (kind: "seenGrades" | "seenHomework", accountId: string, keys: string[]) => void;
+  setSeen: (kind: "seenGradeKeys" | "seenHomework", accountId: string, keys: string[]) => void;
   setBalanceAlert: (walletKey: string, amount: number | null) => void;
   setLastCheck: (result: string) => void;
   setCalendarId: (id: string | undefined) => void;
@@ -53,6 +56,7 @@ export const useNotificationsStore = create<NotificationsState>()(
     set => ({
       preferences: DEFAULT_NOTIFICATION_PREFERENCES,
       seenGrades: {},
+      seenGradeKeys: {},
       seenHomework: {},
       balanceAlerts: {},
       setPreferences: changes =>
